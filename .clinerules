@@ -1,0 +1,61 @@
+```ini
+# Goosuke開発プロジェクト設定
+project_name = "goosuke"
+description = "小～中規模組織向けGoose AIエージェント連携プラットフォーム"
+
+# 言語・フレームワーク設定
+language = "python"
+python_version = "3.10"
+framework = "fastapi"
+
+# コード生成スタイル
+use_type_hints = true
+include_docstrings = true
+follow_pep8 = true
+max_line_length = 100
+
+# ディレクトリ構造を維持
+respect_directory_structure = true
+
+# 依存関係設定
+dependencies = [
+  "fastapi>=0.100.0",
+  "uvicorn>=0.22.0",
+  "python-jose>=3.3.0",
+  "python-multipart>=0.0.6",
+  "sqlalchemy>=2.0.0", 
+  "pydantic>=2.0.0",
+  "aiohttp>=3.8.5",
+  "discord.py>=2.3.0", 
+  "python-dotenv>=1.0.0",
+  "passlib>=1.7.4"
+]
+
+# Docker設定
+docker_base_image = "python:3.10-slim"
+use_multi_stage_build = true
+include_healthcheck = true
+
+# テスト設定
+test_framework = "pytest"
+generate_tests = true
+
+# セキュリティルール
+avoid_secrets_in_code = true
+use_environment_variables = true
+validate_user_input = true
+
+# 出力設定
+create_multiple_files = true
+include_file_paths = true
+
+# 特別な指示
+instructions = [
+  "コードには理解を助ける詳細なコメントを含める",
+  "SQLiteデータベーススキーマは起動時に自動作成されるようにする", 
+  "ローカルテスト用のDocker Compose設定を作成する",
+  "Goose統合では堅牢性とエラー処理に重点を置く",
+  "設定パラメータは環境変数でカスタマイズ可能にする",
+  "コアコードの変更を最小限に抑えて拡張できるように設計する"
+]
+```
