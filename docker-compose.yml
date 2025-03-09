@@ -8,11 +8,14 @@ services:
     volumes:
       - ./:/app
       - ./db:/app/db
+      - ./goose-config:/home/goosuke/.config/goose
     env_file:
       - .env
     networks:
       - goosuke-network
     restart: unless-stopped
+    # コンテナ内のPATHを確認するためのコマンド
+    # command: bash -c "echo $$PATH && which goose || echo 'goose not found' && uvicorn api.main:app --host 0.0.0.0 --port 8000"
 
 networks:
   goosuke-network:

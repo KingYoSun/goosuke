@@ -7,21 +7,35 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     bzip2 \
+    libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 
 # 依存関係のインストール
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Goose CLIのインストール
-RUN curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
+# Goose CLIのインストール - download_cli.shの内容に基づいて修正
+ENV GOOSE_BIN_DIR="/usr/local/bin"
+RUN curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false GOOSE_BIN_DIR=${GOOSE_BIN_DIR} bash && \
+    # インストールされたバイナリに実行権限があることを確認
+    chmod +x ${GOOSE_BIN_DIR}/goose && \
+    # インストールが成功したか確認
+    ${GOOSE_BIN_DIR}/goose --help || echo "Goose CLIのインストールに失敗しました"
 
 # アプリケーションのコピー
 COPY . .
 
 # 実行ユーザーの設定
 RUN useradd -m goosuke
+
+# gooseユーザーに切り替え
 USER goosuke
+
+# PATH設定を明示的に行う
+ENV PATH="/usr/local/bin:${PATH}"
+
+# 最終確認 - gooseコマンドが利用可能か確認
+RUN goose --help || echo "gooseコマンドが見つかりません。PATHを確認してください: $PATH"
 
 # ヘルスチェック
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

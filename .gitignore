@@ -115,6 +115,7 @@ dmypy.json
 # ローカル設定
 instance/
 .webassets-cache
+goose-config/*
 
 # セキュリティ関連
 *.pem

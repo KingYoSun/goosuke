@@ -33,26 +33,28 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         HTTPException: 認証に失敗した場合
     """
     user_service = UserService()
-    user = await user_service.authenticate_user(form_data.username, form_data.password, db)
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="ユーザー名またはパスワードが正しくありません",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    async with db as session:
+        user = await user_service.authenticate_user(form_data.username, form_data.password, session)
 
-    # JWTトークンを生成
-    token_data = {"sub": user.username, "user_id": user.id, "is_admin": user.is_admin}
-    access_token = create_access_token(token_data)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="ユーザー名またはパスワードが正しくありません",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user_id": user.id,
-        "username": user.username,
-        "is_admin": user.is_admin,
-    }
+        # JWTトークンを生成
+        token_data = {"sub": user.username, "user_id": user.id, "is_admin": user.is_admin}
+        access_token = create_access_token(token_data)
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user_id": user.id,
+            "username": user.username,
+            "is_admin": user.is_admin,
+        }
 
 
 @router.post("/register", response_model=Dict[str, Any])
@@ -76,33 +78,17 @@ async def register_user(username: str, email: str, password: str, db: AsyncSessi
     # 最初のユーザーは管理者として登録
     is_admin = False
 
-    # dbがAsyncSessionかどうかを確認
-    if hasattr(db, "execute"):
-        # dbがAsyncSessionの場合
-        result = await db.execute(text("SELECT COUNT(*) FROM users"))
+    # ユーザー数を確認
+    async with db as session:
+        result = await session.execute(text("SELECT COUNT(*) FROM users"))
         count = result.scalar()
         if count == 0:
             is_admin = True
-    else:
-        # dbが_AsyncGeneratorContextManagerの場合
-        async with db as session:
-            result = await session.execute(text("SELECT COUNT(*) FROM users"))
-            count = result.scalar()
-            if count == 0:
-                is_admin = True
 
-    # dbがAsyncSessionかどうかを確認
-    if hasattr(db, "execute"):
-        # dbがAsyncSessionの場合
+        # ユーザーを作成
         user = await user_service.create_user(
-            username=username, email=email, password=password, is_admin=is_admin, db=db
+            username=username, email=email, password=password, is_admin=is_admin, db=session
         )
-    else:
-        # dbが_AsyncGeneratorContextManagerの場合
-        async with db as session:
-            user = await user_service.create_user(
-                username=username, email=email, password=password, is_admin=is_admin, db=session
-            )
 
     if not user:
         raise HTTPException(

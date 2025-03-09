@@ -35,54 +35,27 @@ class UserService:
             async with get_db() as session:
                 return await self.create_user(username, email, password, is_admin, session)
 
-        # dbがAsyncSessionかどうかを確認
-        if hasattr(db, "execute"):
-            # dbがAsyncSessionの場合
-            # ユーザー名またはメールアドレスが既に存在するか確認
-            result = await db.execute(select(User).where((User.username == username) | (User.email == email)))
-            existing_user = result.scalars().first()
+        # ユーザー名またはメールアドレスが既に存在するか確認
+        result = await db.execute(select(User).where((User.username == username) | (User.email == email)))
+        existing_user = result.scalars().first()
 
-            if existing_user:
-                return None
+        if existing_user:
+            return None
 
-            # パスワードをハッシュ化
-            hashed_password = get_password_hash(password)
+        # パスワードをハッシュ化
+        hashed_password = get_password_hash(password)
 
-            # ユーザーを作成
-            user = User(
-                username=username,
-                email=email,
-                hashed_password=hashed_password,
-                is_admin=is_admin,
-            )
+        # ユーザーを作成
+        user = User(
+            username=username,
+            email=email,
+            hashed_password=hashed_password,
+            is_admin=is_admin,
+        )
 
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-        else:
-            # dbが_AsyncGeneratorContextManagerの場合
-            async with db as session:
-                # ユーザー名またはメールアドレスが既に存在するか確認
-                result = await session.execute(select(User).where((User.username == username) | (User.email == email)))
-                existing_user = result.scalars().first()
-
-                if existing_user:
-                    return None
-
-                # パスワードをハッシュ化
-                hashed_password = get_password_hash(password)
-
-                # ユーザーを作成
-                user = User(
-                    username=username,
-                    email=email,
-                    hashed_password=hashed_password,
-                    is_admin=is_admin,
-                )
-
-                session.add(user)
-                await session.commit()
-                await session.refresh(user)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
 
         return {
             "id": user.id,
@@ -107,16 +80,8 @@ class UserService:
             async with get_db() as session:
                 return await self.authenticate_user(username, password, session)
 
-        # dbがAsyncSessionかどうかを確認
-        if hasattr(db, "execute"):
-            # dbがAsyncSessionの場合
-            result = await db.execute(select(User).where(User.username == username))
-            user = result.scalars().first()
-        else:
-            # dbが_AsyncGeneratorContextManagerの場合
-            async with db as session:
-                result = await session.execute(select(User).where(User.username == username))
-                user = result.scalars().first()
+        result = await db.execute(select(User).where(User.username == username))
+        user = result.scalars().first()
 
         if not user:
             return None
