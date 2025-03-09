@@ -29,7 +29,6 @@ class Settings(BaseSettings):
 
     # Discord設定
     DISCORD_BOT_TOKEN: Optional[str] = None
-    DISCORD_WEBHOOK_SECRET: Optional[str] = None
 
     model_config = {
         "env_file": ".env",
