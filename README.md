@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/KingYoSun/goosuke/graph/badge.svg?token=6OVR1O2UMP)](https://codecov.io/gh/KingYoSun/goosuke)
+
 # Goosuke
 
 小～中規模組織向けGoose AIエージェント連携プラットフォーム
