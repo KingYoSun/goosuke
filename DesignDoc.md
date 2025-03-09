@@ -24,17 +24,17 @@ Goosuke は以下の主要コンポーネントで構成されます：
 
 ```
                    ┌────────────────────────────────────┐
-                   │            コンテナ                │
-┌─────────┐        │  ┌────────┐      ┌──────────────┐  │      ┌─────────────┐
-│ Slack   │◄───────┼──┤ FastAPI │◄────┤ Goose CLI    │  │      │ Notion      │
-│ Teams   │        │  │ 層      │      │              │  │      │ Google Drive│
+                   │            コンテナ                 │
+┌─────────┐        │  ┌────────┐      ┌──────────────┐  │       ┌─────────────┐
+│ Slack   │◄───────┼──┤ 発火    │◄────┤ 実行レイヤー  │   │      │ Notion      │
+│ Teams   │        │  │ レイヤー│      │ (Goose CLI)  │  │      │ Google Drive│
 │ Email   │────────┼─►│        │─────►│ Extensions   │──┼─────►│ JIRA        │
 └─────────┘        │  └────────┘      └──────────────┘  │      │ その他      │
                    │            ▲          ▲            │      └─────────────┘
                    └────────────┼──────────┼────────────┘
                                 │          │
                        ┌────────┘          └────────┐
-                       │                             │
+                       │                            │
                ┌───────┴────────┐         ┌─────────┴─────────┐
                │   認証サービス  │         │ ストレージサービス  │
                └────────────────┘         └───────────────────┘
@@ -43,7 +43,8 @@ Goosuke は以下の主要コンポーネントで構成されます：
 ### 2.1 コア技術スタック
 
 - **AI エージェント**: Goose（オープンソース AI エージェント）
-- **API 層**: FastAPI（Python ベースの高性能 Web フレームワーク）
+- **発火レイヤー**: FastAPI（アクションを受け取り、タスクを生成）
+- **実行レイヤー**: Goose CLI（タスクの実行を担当）
 - **コンテナ化**: Docker および Docker Compose（シンプルな環境用）
 - **データベース**: SQLite（小規模用）/ PostgreSQL（中規模用、オプション）
 - **キャッシュ**: Redis（オプション、規模に応じて）
@@ -52,38 +53,51 @@ Goosuke は以下の主要コンポーネントで構成されます：
 
 ## 3. コンポーネント設計
 
-### 3.1 FastAPI レイヤー
+### 3.1 発火レイヤー
 
-FastAPI は以下の機能を提供します：
+発火レイヤーは以下の機能を提供します：
 
+- APIリクエスト、Webhook、Botなどの「アクション」を受け取る
+- 「コンテキスト」と「プロンプト」をセットにして「タスク」を生成
 - RESTful API エンドポイント
 - WebSocket サポート（リアルタイム通信用）
 - 自動ドキュメント生成（OpenAPI）
 - 認証・認可処理
 - リクエスト検証とエラーハンドリング
 - 非同期処理サポート
-- サービス統合のためのルーター
 
 **主要エンドポイント**:
 
 ```
 /api/v1/tasks - タスク管理 (POST, GET, DELETE)
+/api/v1/actions - アクション定義と管理
 /api/v1/agents - エージェント設定 (GET, PUT)
 /api/v1/connections - サービス接続管理
 /api/v1/auth - 認証関連
 /api/v1/webhooks - 外部サービスからのイベント受信
 ```
 
-### 3.2 Goose 統合
+### 3.2 実行レイヤー
 
-Goose CLI を内部的に活用し、以下の機能を提供：
+実行レイヤーは以下の機能を提供します：
 
+- 発火レイヤーから受け取った「タスク」を実行
+- Goose CLIを内部的に活用
 - エージェントの設定と管理
 - プロンプトのカスタマイズとテンプレート
 - エクステンション管理
 - 実行ロギングとモニタリング
 
-### 3.3 拡張システム
+### 3.3 アクションとタスクの関係
+
+Goosuke の中核となる概念は「アクション」と「タスク」です：
+
+- **アクション**: システムへの入力点（APIリクエスト、Slack/Discord botのメッセージ、Webhookなど）
+- **タスク**: アクションから得られた「コンテキスト」と、ユーザーが望む動作を記述した「プロンプト」のセット
+
+この設計により、新しいアクションとタスクを定義するだけで、様々な作業を自動化できます。高い拡張性と操作の簡易さを両立しています。
+
+### 3.4 拡張システム
 
 Goose エクステンションを管理し、以下のカテゴリに分類：
 
@@ -96,18 +110,19 @@ Goose エクステンションを管理し、以下のカテゴリに分類：
 
 ### 4.1 基本フロー
 
-1. ユーザーがSlackでGoosuke宛にメッセージを送信
-2. Slackからのwebhookがコンテナのエンドポイントを呼び出し
-3. FastAPIレイヤーがリクエストを処理し、認証を行う
-4. リクエストをGooseに適したフォーマットに変換
-5. Goose CLIがタスクを実行し、必要に応じて拡張機能を使用
-6. 結果をFastAPIを通じてSlackに返送
+1. ユーザーがSlackでGoosuke宛にメッセージを送信（アクション）
+2. Slackからのwebhookが発火レイヤーのエンドポイントを呼び出し
+3. 発火レイヤーがリクエストを処理し、認証を行う
+4. メッセージの内容からコンテキストを抽出し、プロンプトと組み合わせてタスクを生成
+5. 生成されたタスクを実行レイヤーに渡す
+6. 実行レイヤーがGoose CLIを使用してタスクを実行し、必要に応じて拡張機能を使用
+7. 結果を発火レイヤーを通じてSlackに返送
 
 ### 4.2 非同期処理フロー
 
 長時間実行タスク用：
 
-1. リクエストを受信
+1. アクションを受信
 2. タスクIDを生成して即時応答
 3. タスクをバックグラウンドワーカーにキューイング
 4. 処理完了時にコールバックURLに通知
@@ -189,8 +204,8 @@ Goosuke は小～中規模組織が頻繁に利用する以下の外部サービ
 
 ```
 goosuke/
-├── api/                # FastAPI アプリケーション
-├── goose/              # Goose CLI とカスタマイズ
+├── api/                # 発火レイヤー（FastAPI アプリケーション）
+├── goose/              # 実行レイヤー（Goose CLI とカスタマイズ）
 ├── extensions/         # 拡張機能
 ├── config/             # 設定ファイル
 ├── scripts/            # デプロイ・管理スクリプト
@@ -231,7 +246,7 @@ goosuke/
 
 ### フェーズ 1（MVP）
 - シンプルな Docker Compose 設定
-- FastAPI と Goose の基本統合
+- 発火レイヤーと実行レイヤーの基本統合
 - Slack/Discord 連携による会議要約機能
 - 簡易認証
 
@@ -263,124 +278,23 @@ goosuke/
 - バージョン互換性の明確な文書化
 - リソース使用の自動調整機能
 
-## 12. レファレンス実装
+## 12. リスクと対策
 
-### 12.1 基本的なFastAPIルーターの例
-
-```python
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List
-from .models import TaskRequest, TaskResponse
-from .auth import get_current_user
-from .goose_service import GooseExecutor
-
-router = APIRouter(prefix="/api/v1/tasks")
-
-@router.post("/", response_model=TaskResponse)
-async def create_task(
-    task: TaskRequest, 
-    current_user = Depends(get_current_user)
-):
-    """タスクを作成して実行"""
-    executor = GooseExecutor()
-    result = await executor.execute(
-        task.prompt,
-        extensions=task.extensions,
-        context=task.context
-    )
-    
-    return TaskResponse(
-        id=result.id,
-        status="completed" if result.success else "failed",
-        result=result.output,
-        created_at=result.timestamp
-    )
-
-@router.get("/{task_id}", response_model=TaskResponse)
-async def get_task(task_id: str, current_user = Depends(get_current_user)):
-    """タスクの情報を取得"""
-    # 実装内容
-```
-
-### 12.2 Goose実行サービスの例
-
-```python
-import subprocess
-import json
-import asyncio
-from uuid import uuid4
-from datetime import datetime
-
-class GooseExecutor:
-    def __init__(self, goose_path="/app/goose/bin/goose"):
-        self.goose_path = goose_path
-        
-    async def execute(self, prompt, extensions=None, context=None):
-        """Goose CLIを実行して結果を返す"""
-        task_id = str(uuid4())
-        
-        cmd = [self.goose_path, "execute", "--prompt", prompt]
-        
-        if extensions:
-            for ext in extensions:
-                cmd.extend(["--extension", ext])
-                
-        if context:
-            context_file = f"/tmp/context_{task_id}.json"
-            with open(context_file, "w") as f:
-                json.dump(context, f)
-            cmd.extend(["--context-file", context_file])
-            
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                return {
-                    "id": task_id,
-                    "success": False,
-                    "output": stderr.decode(),
-                    "timestamp": datetime.now()
-                }
-                
-            return {
-                "id": task_id,
-                "success": True,
-                "output": stdout.decode(),
-                "timestamp": datetime.now()
-            }
-            
-        except Exception as e:
-            return {
-                "id": task_id,
-                "success": False,
-                "output": str(e),
-                "timestamp": datetime.now()
-            }
-```
-
-## 13. リスクと対策
-
-### 13.1 小～中規模組織向けリスク
+### 12.1 小～中規模組織向けリスク
 
 - APIコスト管理（予算を超えるリスク）
 - シンプルな運用管理の実現
 - 技術的理解が限られたユーザーへのサポート
 - データ保護とプライバシー管理の簡易化
 
-### 13.2 対策
+### 12.2 対策
 
 - 使用量の可視化と予算管理ツール
 - 運用自動化とシンプルな管理インターフェース
 - コミュニティサポートとドキュメント充実
 - プライバシー設定テンプレートの提供
 
-### 13.3 コミュニティ活用
+### 12.3 コミュニティ活用
 
 - オープンソースコミュニティでの拡張機能共有
 - ユースケーステンプレートのコミュニティライブラリ

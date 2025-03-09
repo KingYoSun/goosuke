@@ -1,0 +1,34 @@
+version: '3'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+      target: test
+    environment:
+      - GOOSUKE_ENV=test
+      - "DATABASE_URL=sqlite:///:memory:"
+      - SECRET_KEY=test_secret_key
+    volumes:
+      - ./:/app
+      - test-results:/app/test-results
+
+  lint:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+      target: lint
+    volumes:
+      - ./:/app
+
+  format:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+      target: format
+    volumes:
+      - ./:/app
+
+volumes:
+  test-results:

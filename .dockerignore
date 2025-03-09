@@ -1,0 +1,93 @@
+# Git関連
+.git
+.gitignore
+.github
+
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 仮想環境
+venv/
+.venv/
+env/
+ENV/
+
+# 環境変数ファイル（本番環境用の.envは除外しない場合もある）
+.env
+.env.local
+.env.development
+.env.test
+.env.*.local
+
+# テスト関連
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ドキュメント
+docs/
+*.md
+!README.md
+
+# IDE/エディタ関連
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS関連
+.DS_Store
+Thumbs.db
+
+# ログファイル
+*.log
+logs/
+log/
+
+# データベース
+*.sqlite
+*.sqlite3
+*.db
+
+# Docker関連（Dockerfileと必要な設定ファイルは除外しない）
+docker-compose.yml
+docker-compose.override.yml
+.dockerignore
+
+# その他の不要なファイル
+tmp/
+temp/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# プロジェクト固有の除外ファイル
+# 例: 大きなデータファイルなど
+# data/large_files/

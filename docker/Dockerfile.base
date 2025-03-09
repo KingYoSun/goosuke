@@ -1,0 +1,74 @@
+# ベースステージ - 共通の依存関係
+FROM python:3.10-slim AS base
+
+WORKDIR /app
+
+# 必要な最小限のパッケージのインストール
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 依存関係のインストール
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 開発ステージ - 開発用ツールを含む
+FROM base AS dev
+
+# 開発用の追加依存関係
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    flake8 \
+    mypy \
+    black \
+    isort \
+    autoflake \
+    httpx \
+    types-passlib \
+    types-python-jose
+
+# テストステージ - テスト実行用
+FROM dev AS test
+
+# アプリケーションのコピー
+COPY . .
+
+# テスト実行コマンド
+CMD ["pytest", "--cov=.", "--cov-report=xml", "--cov-report=term"]
+
+# リントステージ - リント実行用
+FROM dev AS lint
+
+# アプリケーションのコピー
+COPY . .
+
+# リント実行コマンド
+CMD ["sh", "-c", "flake8 . && mypy --ignore-missing-imports --disable-error-code attr-defined --disable-error-code assignment --disable-error-code arg-type --disable-error-code union-attr --disable-error-code call-overload --disable-error-code type-var --disable-error-code no-any-return . && black --check . && isort --check-only --profile black ."]
+
+# フォーマットステージ - コード自動整形用
+FROM dev AS format
+
+# アプリケーションのコピー
+COPY . .
+
+# フォーマット実行コマンド
+CMD ["sh", "-c", "autoflake --remove-all-unused-imports --recursive --in-place --exclude=__init__.py . && black . && isort --profile black ."]
+
+# 本番ステージ - 最小限の依存関係のみを含む
+FROM base AS prod
+
+# アプリケーションのコピー
+COPY . .
+
+# ヘルスチェック
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/api/health || exit 1
+
+# 実行ユーザーの設定
+RUN useradd -m goosuke
+USER goosuke
+
+# コマンド
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

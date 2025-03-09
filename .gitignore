@@ -1,0 +1,134 @@
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 仮想環境
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# 環境変数ファイル
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# データベース
+*.sqlite
+*.sqlite3
+*.db
+
+# ログファイル
+*.log
+logs/
+log/
+
+# テスト関連
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+test_results/
+
+# FastAPI/Uvicorn
+.uvicorn/
+
+# Docker関連
+.docker/
+docker-compose.override.yml
+
+# IDE/エディタ関連
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# macOS関連
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows関連
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux関連
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# プロジェクト固有
+# SQLiteデータベースファイル（開発用）
+*.sqlite
+*.db
+
+# キャッシュディレクトリ
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# ローカル設定
+instance/
+.webassets-cache
+
+# セキュリティ関連
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.p12
+*.pfx
+*.p7b
+*.p7r
+*.spc
+*.sst
+
+# 一時ファイル
+tmp/
+temp/

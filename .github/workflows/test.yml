@@ -1,0 +1,41 @@
+name: Goosuke Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Run linting
+        run: |
+          docker-compose -f docker-compose.test.yml run --rm lint
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+    
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Set Python version in Dockerfile
+        run: |
+          sed -i "s/FROM python:3.10-slim/FROM python:${{ matrix.python-version }}-slim/" docker/Dockerfile.base
+      - name: Run tests
+        run: |
+          docker-compose -f docker-compose.test.yml run --rm test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: true

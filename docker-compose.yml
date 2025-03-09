@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - ./db:/app/db
+    env_file:
+      - .env
+    networks:
+      - goosuke-network
+    restart: unless-stopped
+
+networks:
+  goosuke-network:
+    driver: bridge
