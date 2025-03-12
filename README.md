@@ -1,12 +1,17 @@
 [![codecov](https://codecov.io/gh/KingYoSun/goosuke/graph/badge.svg?token=6OVR1O2UMP)](https://codecov.io/gh/KingYoSun/goosuke)
 
-# Goosuke
-
-小～中規模組織向けGoose AIエージェント連携プラットフォーム
+<div align="center">
+  <img src="docs/images/logo.png" alt="Goosuke Logo" width="200">
+  <h1>Goosuke</h1>
+  <p><strong>小～中規模組織向けGoose AIエージェント連携プラットフォーム</strong></p>
+  <p><em>Minimal Triggers, Maximum Automation</em></p>
+</div>
 
 ## プロジェクト概要
 
 Goosuke は小～中規模組織向けの業務効率化ツールで、オープンソースのAIエージェント「Goose」とFastAPIを組み合わせたプラットフォームです。Dockerコンテナ環境で動作し、Discordと連携して、会議の要約作成などを自動化します。
+
+最小限のトリガーで最大限の自動化を実現し、チームの生産性向上をサポートします。
 
 ## 機能
 
@@ -14,6 +19,7 @@ Goosuke は小～中規模組織向けの業務効率化ツールで、オープ
 - **拡張機能管理**: Goose拡張機能のインストールと管理
 - **API**: RESTful APIによる柔軟な連携
 - **認証**: JWTベースの認証システム
+- **自動化ワークフロー**: 最小限のトリガーで複雑なタスクを自動実行
 
 ## 技術スタック
 
@@ -62,7 +68,7 @@ Goosuke は「アクション」と「タスク」の2つの概念を中心に�
 1. **アクション**: APIリクエスト、Slack/Discord botのメッセージ、Webhookなど、システムへの入力点
 2. **タスク**: アクションから得られた「コンテキスト」と、ユーザーが望む動作を記述した「プロンプト」のセット
 
-この設計により、新しいアクションとタスクを定義するだけで、様々な作業を自動化できます。
+この設計により、新しいアクションとタスクを定義するだけで、様々な作業を自動化できます。最小限のトリガーで最大限の自動化を実現するGoosukeの中核的な考え方です。
 
 ### APIの利用
 
@@ -131,6 +137,8 @@ uvicorn api.main:app --reload
 ```bash
 pytest
 ```
+
+詳細なテスト方法については、[テストドキュメント](docs/testing.md)を参照してください。
 
 ## ライセンス
 
