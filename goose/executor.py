@@ -301,7 +301,7 @@ class TaskExecutor:
         enhanced_prompt = prompt
         if context:
             context_str = json.dumps(context, ensure_ascii=False, indent=2)
-            enhanced_prompt = f"コンテキスト情報:\n{context_str}\n\n指示:\n{prompt}"
+            enhanced_prompt = f"contexts:\n{context_str}\n\nprompts:\n{prompt}"
 
         # cli.pyのrun_with_text関数を使用
         success, output, error = await cli.run_with_text(enhanced_prompt, session_name)

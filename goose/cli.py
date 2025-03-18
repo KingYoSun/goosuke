@@ -5,8 +5,35 @@ Goose CLIコマンド実行ユーティリティ
 """
 
 import asyncio
+import re
 from typing import List, Optional, Tuple
 
+
+def strip_ansi_codes(text: str) -> str:
+    """ANSIエスケープコードを除去する
+
+    Args:
+        text (str): ANSIコードを含む可能性のあるテキスト
+
+    Returns:
+        str: ANSIコードが除去されたテキスト
+    """
+    # 一般的なANSIエスケープコードを除去
+    ansi_escape1 = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    # エスケープ文字が省略された形式のANSIコードも除去
+    ansi_escape2 = re.compile(r'\[(?:[0-9]{1,3}(?:;[0-9]{1,3})*)?[m]')
+
+    # 両方の正規表現を適用
+    text = ansi_escape1.sub('', text)
+    text = ansi_escape2.sub('', text)
+    return text
+
+def strip_loggin_rows(text: str) -> str:
+    # "starting session"から"working directory"までの行を削除
+    # 複数行にマッチする正規表現パターン
+    pattern = r"^.*starting session.*\n.*logging to.*\n.*working directory.*\n"
+    # セッション情報を削除
+    return re.sub(pattern, "", text, flags=re.MULTILINE)
 
 async def run_command(command: List[str]) -> Tuple[bool, str, Optional[str]]:
     """Goose CLIコマンドを実行する
@@ -27,7 +54,10 @@ async def run_command(command: List[str]) -> Tuple[bool, str, Optional[str]]:
         if process.returncode != 0:
             return False, "", stderr.decode()
 
-        return True, stdout.decode(), None
+        # stdoutをデコードし、ANSIコードを除去
+        cleaned_output = strip_ansi_codes(stdout.decode())
+        cleaned_output = strip_loggin_rows(cleaned_output)
+        return True, cleaned_output, None
     except Exception as e:
         return False, "", str(e)
 
