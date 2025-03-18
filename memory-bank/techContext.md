@@ -113,6 +113,13 @@ goosuke/
 │   ├── __init__.py
 │   ├── conftest.py     # テスト設定
 │   └── test_*.py       # テストファイル
+├── memory-bank/        # メモリーバンク（プロジェクト文書）
+│   ├── activeContext.md
+│   ├── productContext.md
+│   ├── progress.md
+│   ├── projectbrief.md
+│   ├── systemPatterns.md
+│   └── techContext.md
 ├── .env.example        # 環境変数の例
 ├── .flake8             # flake8設定
 ├── .gitignore          # Gitの除外ファイル
@@ -144,6 +151,7 @@ goosuke/
 ### Discord連携
 - **Bot権限**: メッセージの読み取り、送信、リアクションの追加
 - **イベント**: メッセージ、リアクション、コマンド
+- **リアクショントリガー**: 鉛筆リアクションによる要約機能
 
 ### コンテナ化
 - **マルチステージビルド**: 軽量なイメージ
@@ -208,8 +216,8 @@ line_length = 88
 Goose CLIは以下の設定が必要です：
 
 1. LLM Providerの設定
-   - OpenAI、Anthropic、Mistral AIなどのプロバイダー
-   - APIキー
+   - 現在はAnthropicプロバイダーを使用（.envファイルで設定）
+   - APIキー（ANTHROPIC_API_KEY）
 
 2. 拡張機能の設定
    - MCPベースの拡張機能
@@ -242,8 +250,19 @@ DISCORD_BOT_TOKEN=your-discord-bot-token
 DISCORD_GUILD_ID=your-discord-guild-id
 
 # Goose設定
-GOOSE_PATH=/usr/local/bin/goose
+GOOSE_PROVIDER=anthropic
+GOOSE_MODEL=claude-3-7-sonnet-latest
+ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
+
+## セキュリティ上の注意点
+
+現在の実装では、`.env`ファイルに機密情報（Discord BotトークンやAnthropic APIキー）が平文で保存されています。これはセキュリティリスクとなるため、以下の対策を検討中です：
+
+1. 環境変数の暗号化
+2. シークレット管理サービスの利用
+3. コンテナ実行時のみ環境変数を注入する方法
+4. `.env`ファイルのアクセス制限強化
 
 ## デプロイメント
 
@@ -264,6 +283,9 @@ services:
       - DATABASE_URL=sqlite:///db/sqlite.db
       - SECRET_KEY=${SECRET_KEY}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOSE_PROVIDER=${GOOSE_PROVIDER}
+      - GOOSE_MODEL=${GOOSE_MODEL}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
