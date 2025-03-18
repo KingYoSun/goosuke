@@ -2,6 +2,9 @@ FROM python:3.10-slim as base
 
 WORKDIR /app
 
+ARG GOOSE_PROVIDER
+ARG GOOSE_MODEL
+
 # 必要なパッケージのインストール
 RUN apt-get update && apt-get install -y \
     curl \
@@ -33,6 +36,14 @@ USER goosuke
 
 # PATH設定を明示的に行う
 ENV PATH="/usr/local/bin:${PATH}"
+
+# Goose CLIの設定
+RUN mkdir -p /home/goosuke/.config/goose
+RUN cat <<EOF > /home/goosuke/.config/goose/config.yaml
+GOOSE_PROVIDER: ${GOOSE_PROVIDER}
+GOOSE_MODEL: ${GOOSE_MODEL}
+keyring: false
+EOF
 
 # 最終確認 - gooseコマンドが利用可能か確認
 RUN goose --help || echo "gooseコマンドが見つかりません。PATHを確認してください: $PATH"

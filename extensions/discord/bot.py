@@ -24,7 +24,10 @@ class DiscordService:
         """
         self.token = token
         self.goose_executor = goose_executor
-        intents = discord.Intents.all()
+        # 必要なインテントのみを有効化
+        intents = discord.Intents.default()
+        intents.message_content = True  # メッセージ内容の読み取りに必要
+        intents.reactions = True  # リアクションの検出に必要
         self.bot = commands.Bot(command_prefix="!", intents=intents)
         self.setup_bot()
         self.logger = logging.getLogger("discord_service")
@@ -86,7 +89,7 @@ class DiscordService:
             }
 
             # Gooseに要約リクエスト
-            prompt = "以下の会話を簡潔に要約してください。重要なポイントを箇条書きでまとめ、その後に要約文を作成してください。"
+            prompt = "以下の会話を簡潔に要約してください。重要なポイントを箇条書きでまとめ、その後に要約文を作成してください。\n要約文にANSIコードを付与しないでください。"
 
             result = await self.goose_executor.execute(prompt, context=context)
 

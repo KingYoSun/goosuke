@@ -35,7 +35,7 @@ Base = declarative_base()
 
 
 @asynccontextmanager
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def _get_db_context() -> AsyncGenerator[AsyncSession, None]:
     """非同期データベースセッションを取得するコンテキストマネージャ
     Yields:
         AsyncSession: 非同期SQLAlchemyセッション
@@ -47,6 +47,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """非同期データベースセッションを取得する依存関係
+    Yields:
+        AsyncSession: 非同期SQLAlchemyセッション
+    """
+    async with _get_db_context() as session:
+        yield session
 
 
 async def init_db() -> None:
