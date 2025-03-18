@@ -6,7 +6,6 @@ Discord.pyを使用してBotを実装し、メッセージやリアクション�
 """
 
 import logging
-from typing import List, Set
 
 import discord
 from discord.ext import commands

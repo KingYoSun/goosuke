@@ -19,14 +19,15 @@ def strip_ansi_codes(text: str) -> str:
         str: ANSIコードが除去されたテキスト
     """
     # 一般的なANSIエスケープコードを除去
-    ansi_escape1 = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    ansi_escape1 = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
     # エスケープ文字が省略された形式のANSIコードも除去
-    ansi_escape2 = re.compile(r'\[(?:[0-9]{1,3}(?:;[0-9]{1,3})*)?[m]')
+    ansi_escape2 = re.compile(r"\[(?:[0-9]{1,3}(?:;[0-9]{1,3})*)?[m]")
 
     # 両方の正規表現を適用
-    text = ansi_escape1.sub('', text)
-    text = ansi_escape2.sub('', text)
+    text = ansi_escape1.sub("", text)
+    text = ansi_escape2.sub("", text)
     return text
+
 
 def strip_loggin_rows(text: str) -> str:
     # "starting session"から"working directory"までの行を削除
@@ -34,6 +35,7 @@ def strip_loggin_rows(text: str) -> str:
     pattern = r"^.*starting session.*\n.*logging to.*\n.*working directory.*\n"
     # セッション情報を削除
     return re.sub(pattern, "", text, flags=re.MULTILINE)
+
 
 async def run_command(command: List[str]) -> Tuple[bool, str, Optional[str]]:
     """Goose CLIコマンドを実行する

@@ -48,6 +48,7 @@ async def _get_db_context() -> AsyncGenerator[AsyncSession, None]:
             await session.rollback()
             raise
 
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """非同期データベースセッションを取得する依存関係
     Yields:

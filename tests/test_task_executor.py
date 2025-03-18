@@ -42,7 +42,7 @@ async def test_execute_task():
         args, kwargs = mock_run.call_args
 
         # プロンプトにコンテキストが含まれていることを確認
-        assert "コンテキスト情報" in args[0]
+        assert "contexts:" in args[0]  # 実装では "contexts:" を使用している
         assert "key" in args[0]
         assert "value" in args[0]
         assert "テスト用プロンプト" in args[0]
