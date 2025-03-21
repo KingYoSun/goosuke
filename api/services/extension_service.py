@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from goose.executor import TaskExecutor
 
-from ..database import get_db
+from ..database import _get_db_context
 from ..models.extension import Extension
 
 
@@ -32,7 +32,7 @@ class ExtensionService:
         Returns:
             List[Dict[str, Any]]: 拡張機能のリスト
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             db_extensions = await self._get_db_extensions(db)
 
             # 情報を整形
@@ -59,7 +59,7 @@ class ExtensionService:
         Returns:
             Dict[str, Any]: 追加された拡張機能
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             # DBに拡張機能情報を追加
             new_extension = Extension(
                 name=extension_data.name,
@@ -91,7 +91,7 @@ class ExtensionService:
         Returns:
             Optional[Dict[str, Any]]: 拡張機能の詳細
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             extension = await db.get(Extension, extension_id)
             if not extension:
                 return None
@@ -114,7 +114,7 @@ class ExtensionService:
         Returns:
             Optional[Dict[str, Any]]: 更新された拡張機能
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             extension = await db.get(Extension, extension_id)
             if not extension:
                 return None
@@ -147,7 +147,7 @@ class ExtensionService:
         Returns:
             bool: 削除に成功した場合はTrue、それ以外はFalse
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             extension = await db.get(Extension, extension_id)
             if not extension:
                 return False
@@ -176,7 +176,7 @@ class ExtensionService:
         message = "新しいGoose CLIコマンド体系では拡張機能のインストールコマンドが提供されていません。手動でのインストールが必要です。"
 
         # データベースに拡張機能情報を追加
-        async with get_db() as db:
+        async with _get_db_context() as db:
             # 既存の拡張機能を確認
             result = await db.execute(select(Extension).where(Extension.name == name))
             existing = result.scalars().first()

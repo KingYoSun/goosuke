@@ -2,7 +2,7 @@
 タスクサービスモジュール
 
 このモジュールは、発火レイヤーで生成されたタスクの実行と管理を行うサービスを提供します。
-コンテキストとプロンプトをセットにしたタスクを作成し、実行レイヤーに渡します。
+タスクテンプレートの管理と、タスク実行の記録を行います。
 """
 
 from datetime import datetime
@@ -12,8 +12,9 @@ from sqlalchemy import select
 
 from goose.executor import TaskExecutor
 
-from ..database import get_db
-from ..models.task import Task
+from ..database import _get_db_context
+from ..models.task_execution import TaskExecution
+from ..models.task_template import TaskTemplate
 
 
 class TaskService:
@@ -29,72 +30,106 @@ class TaskService:
         """
         self.task_executor = task_executor or TaskExecutor()
 
-    async def create_task(
+    async def create_task_template(
         self,
         task_type: str,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        name: str,
         user_id: Optional[int] = None,
-        extensions: Optional[List[str]] = None,
-        name: Optional[str] = None,
-        is_template: bool = False,
-        parent_id: Optional[int] = None,
+        description: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """タスクを作成して実行
+        """タスクテンプレートを作成
 
         Args:
             task_type (str): タスクタイプ
             prompt (str): ユーザーが望む動作を記述したプロンプト
-            context (Optional[Dict[str, Any]], optional): アクションから得られたコンテキスト。デフォルトはNone
+            name (str): テンプレート名
             user_id (Optional[int], optional): ユーザーID。デフォルトはNone
-            extensions (Optional[List[str]], optional): 使用する拡張機能のリスト。デフォルトはNone
-            name (Optional[str], optional): タスク名（再利用のため）。デフォルトはNone
-            is_template (bool, optional): テンプレートとして使用可能か。デフォルトはFalse
-            parent_id (Optional[int], optional): 親タスク（テンプレート）のID。デフォルトはNone
+            description (Optional[str], optional): テンプレートの説明。デフォルトはNone
 
         Returns:
-            Dict[str, Any]: 実行結果
+            Dict[str, Any]: 作成されたタスクテンプレート
         """
-        # データベースにタスクを記録
-        async with get_db() as db:
-            task = Task(
+        # データベースにタスクテンプレートを記録
+        async with _get_db_context() as db:
+            task_template = TaskTemplate(
                 user_id=user_id,
                 name=name,
                 task_type=task_type,
                 prompt=prompt,
+                description=description,
+            )
+            db.add(task_template)
+            await db.commit()
+            await db.refresh(task_template)
+
+            return {
+                "template_id": task_template.id,
+                "name": task_template.name,
+                "task_type": task_template.task_type,
+                "prompt": task_template.prompt,
+                "description": task_template.description,
+                "user_id": task_template.user_id,
+                "created_at": task_template.created_at.isoformat() if task_template.created_at else None,
+            }
+
+    async def execute_task(
+        self,
+        template_id: int,
+        context: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        extensions: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """タスクを実行
+
+        Args:
+            template_id (int): タスクテンプレートID
+            context (Optional[Dict[str, Any]], optional): アクションから得られたコンテキスト。デフォルトはNone
+            user_id (Optional[int], optional): ユーザーID。デフォルトはNone
+            extensions (Optional[List[str]], optional): 使用する拡張機能のリスト。デフォルトはNone
+
+        Returns:
+            Dict[str, Any]: 実行結果
+        """
+        # タスクテンプレートを取得
+        async with _get_db_context() as db:
+            task_template = await db.get(TaskTemplate, template_id)
+            if not task_template:
+                return {
+                    "success": False,
+                    "output": f"テンプレートID {template_id} が見つかりません",
+                }
+
+            # タスク実行ログを作成
+            task_execution = TaskExecution(
+                template_id=template_id,
+                user_id=user_id,
                 context=context,
                 status="processing",
-                is_template=is_template,
-                parent_id=parent_id,
             )
-            db.add(task)
+            db.add(task_execution)
             await db.commit()
-            await db.refresh(task)
-
-            # テンプレートの場合は実行しない
-            if is_template:
-                return {
-                    "task_id": task.id,
-                    "success": True,
-                    "message": "テンプレートとして保存されました",
-                }
+            await db.refresh(task_execution)
 
             try:
                 # 実行レイヤーでタスクを実行
-                result = await self.task_executor.execute_task(prompt=prompt, context=context, extensions=extensions)
+                result = await self.task_executor.execute_task(
+                    prompt=task_template.prompt, context=context, extensions=extensions
+                )
 
-                # タスクを更新
-                task.result = result["output"]
-                task.extensions_output = result.get("extensions_output", {})
-                task.status = "completed" if result["success"] else "failed"
-                task.error = None if result["success"] else result["output"]
-                task.completed_at = datetime.now()
+                # タスク実行ログを更新
+                task_execution.result = result["output"]
+                task_execution.extensions_output = result.get("extensions_output", {})
+                task_execution.status = "completed" if result["success"] else "failed"
+                task_execution.error = None if result["success"] else result["output"]
+                task_execution.completed_at = datetime.now()
 
                 await db.commit()
-                await db.refresh(task)
+                await db.refresh(task_execution)
 
                 return {
-                    "task_id": task.id,
+                    "execution_id": task_execution.id,
+                    "template_id": task_template.id,
                     "success": result["success"],
                     "output": result["output"],
                     "extensions_output": result.get("extensions_output", {}),
@@ -102,58 +137,81 @@ class TaskService:
 
             except Exception as e:
                 # エラー発生時
-                task.status = "failed"
-                task.error = str(e)
-                task.completed_at = datetime.now()
+                task_execution.status = "failed"
+                task_execution.error = str(e)
+                task_execution.completed_at = datetime.now()
 
                 await db.commit()
 
                 return {
-                    "task_id": task.id,
+                    "execution_id": task_execution.id,
+                    "template_id": task_template.id,
                     "success": False,
                     "output": str(e),
                     "extensions_output": {},
                 }
 
-    async def get_task(self, task_id: int) -> Optional[Dict[str, Any]]:
-        """タスクの詳細を取得
+    async def get_task_template(self, template_id: int) -> Optional[Dict[str, Any]]:
+        """タスクテンプレートの詳細を取得
 
         Args:
-            task_id (int): タスクID
+            template_id (int): タスクテンプレートID
 
         Returns:
-            Optional[Dict[str, Any]]: タスクの詳細
+            Optional[Dict[str, Any]]: タスクテンプレートの詳細
         """
-        async with get_db() as db:
-            task = await db.get(Task, task_id)
-            if not task:
+        async with _get_db_context() as db:
+            task_template = await db.get(TaskTemplate, template_id)
+            if not task_template:
                 return None
 
             return {
-                "id": task.id,
-                "user_id": task.user_id,
-                "name": task.name,
-                "task_type": task.task_type,
-                "prompt": task.prompt,
-                "context": task.context,
-                "result": task.result,
-                "extensions_output": task.extensions_output,
-                "status": task.status,
-                "error": task.error,
-                "is_template": task.is_template,
-                "parent_id": task.parent_id,
-                "created_at": task.created_at.isoformat() if task.created_at else None,
-                "completed_at": (task.completed_at.isoformat() if task.completed_at else None),
+                "id": task_template.id,
+                "user_id": task_template.user_id,
+                "name": task_template.name,
+                "task_type": task_template.task_type,
+                "prompt": task_template.prompt,
+                "description": task_template.description,
+                "created_at": task_template.created_at.isoformat() if task_template.created_at else None,
+                "updated_at": task_template.updated_at.isoformat() if task_template.updated_at else None,
             }
 
-    async def list_tasks(
+    async def get_task_execution(self, execution_id: int) -> Optional[Dict[str, Any]]:
+        """タスク実行ログの詳細を取得
+
+        Args:
+            execution_id (int): タスク実行ログID
+
+        Returns:
+            Optional[Dict[str, Any]]: タスク実行ログの詳細
+        """
+        async with _get_db_context() as db:
+            task_execution = await db.get(TaskExecution, execution_id)
+            if not task_execution:
+                return None
+
+            return {
+                "id": task_execution.id,
+                "template_id": task_execution.template_id,
+                "user_id": task_execution.user_id,
+                "context": task_execution.context,
+                "result": task_execution.result,
+                "extensions_output": task_execution.extensions_output,
+                "status": task_execution.status,
+                "error": task_execution.error,
+                "created_at": task_execution.created_at.isoformat() if task_execution.created_at else None,
+                "updated_at": task_execution.updated_at.isoformat() if task_execution.updated_at else None,
+                "completed_at": task_execution.completed_at.isoformat() if task_execution.completed_at else None,
+            }
+
+    async def list_task_templates(
         self,
         user_id: Optional[int] = None,
         task_type: Optional[str] = None,
         limit: int = 10,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        """タスクの一覧を取得
+        """タスクテンプレートの一覧を取得
 
         Args:
             user_id (Optional[int], optional): ユーザーID。デフォルトはNone
@@ -162,33 +220,80 @@ class TaskService:
             offset (int, optional): オフセット。デフォルトは0
 
         Returns:
-            List[Dict[str, Any]]: タスクのリスト
+            List[Dict[str, Any]]: タスクテンプレートのリスト
         """
-        async with get_db() as db:
-            query = select(Task)
+        async with _get_db_context() as db:
+            query = select(TaskTemplate)
 
             if user_id is not None:
-                query = query.where(Task.user_id == user_id)
+                query = query.where(TaskTemplate.user_id == user_id)
 
             if task_type is not None:
-                query = query.where(Task.task_type == task_type)
+                query = query.where(TaskTemplate.task_type == task_type)
 
-            query = query.order_by(Task.created_at.desc()).limit(limit).offset(offset)
+            query = query.order_by(TaskTemplate.created_at.desc()).limit(limit).offset(offset)
 
             result = await db.execute(query)
-            tasks = result.scalars().all()
+            templates = result.scalars().all()
 
             return [
                 {
-                    "id": task.id,
-                    "user_id": task.user_id,
-                    "name": task.name,
-                    "task_type": task.task_type,
-                    "status": task.status,
-                    "is_template": task.is_template,
-                    "parent_id": task.parent_id,
-                    "created_at": (task.created_at.isoformat() if task.created_at else None),
-                    "completed_at": (task.completed_at.isoformat() if task.completed_at else None),
+                    "id": template.id,
+                    "user_id": template.user_id,
+                    "name": template.name,
+                    "task_type": template.task_type,
+                    "description": template.description,
+                    "created_at": template.created_at.isoformat() if template.created_at else None,
+                    "updated_at": template.updated_at.isoformat() if template.updated_at else None,
                 }
-                for task in tasks
+                for template in templates
+            ]
+
+    async def list_task_executions(
+        self,
+        template_id: Optional[int] = None,
+        user_id: Optional[int] = None,
+        status: Optional[str] = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """タスク実行ログの一覧を取得
+
+        Args:
+            template_id (Optional[int], optional): タスクテンプレートID。デフォルトはNone
+            user_id (Optional[int], optional): ユーザーID。デフォルトはNone
+            status (Optional[str], optional): ステータス。デフォルトはNone
+            limit (int, optional): 取得件数。デフォルトは10
+            offset (int, optional): オフセット。デフォルトは0
+
+        Returns:
+            List[Dict[str, Any]]: タスク実行ログのリスト
+        """
+        async with _get_db_context() as db:
+            query = select(TaskExecution)
+
+            if template_id is not None:
+                query = query.where(TaskExecution.template_id == template_id)
+
+            if user_id is not None:
+                query = query.where(TaskExecution.user_id == user_id)
+
+            if status is not None:
+                query = query.where(TaskExecution.status == status)
+
+            query = query.order_by(TaskExecution.created_at.desc()).limit(limit).offset(offset)
+
+            result = await db.execute(query)
+            executions = result.scalars().all()
+
+            return [
+                {
+                    "id": execution.id,
+                    "template_id": execution.template_id,
+                    "user_id": execution.user_id,
+                    "status": execution.status,
+                    "created_at": execution.created_at.isoformat() if execution.created_at else None,
+                    "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
+                }
+                for execution in executions
             ]

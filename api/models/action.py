@@ -5,7 +5,6 @@
 """
 
 from sqlalchemy import (
-    JSON,
     Boolean,
     Column,
     DateTime,
@@ -30,14 +29,10 @@ class Action(Base):
     name = Column(String, index=True, nullable=False)  # アクション名
     action_type = Column(String, index=True, nullable=False)  # 'api', 'discord', 'slack', 'webhook'
 
-    # アクション設定
-    config = Column(JSON, nullable=True)  # アクション固有の設定
+    # アクション設定とコンテキスト抽出ルールは別テーブルで管理するため削除
 
-    # コンテキスト抽出ルール
-    context_rules = Column(JSON, nullable=True)  # コンテキスト抽出のためのルール
-
-    # 関連するタスク
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+    # 関連するタスクテンプレート
+    task_template_id = Column(Integer, ForeignKey("task_templates.id"), nullable=True)
 
     is_enabled = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -45,7 +40,7 @@ class Action(Base):
     last_triggered_at = Column(DateTime(timezone=True), nullable=True)
 
     # リレーションシップ
-    task = relationship("Task", backref="actions")
+    task_template = relationship("TaskTemplate", backref="actions")
 
     def __repr__(self) -> str:
         """文字列表現

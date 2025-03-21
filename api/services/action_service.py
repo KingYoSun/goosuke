@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 
-from ..database import get_db
+from ..database import _get_db_context
 from ..models.action import Action
-from ..models.task import Task
+from ..models.task_template import TaskTemplate
 from .task_service import TaskService
 
 
@@ -33,29 +33,23 @@ class ActionService:
         self,
         name: str,
         action_type: str,
-        config: Optional[Dict[str, Any]] = None,
-        context_rules: Optional[Dict[str, Any]] = None,
-        task_id: Optional[int] = None,
+        task_template_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """アクションを作成
 
         Args:
             name (str): アクション名
             action_type (str): アクションタイプ（'api', 'discord', 'slack', 'webhook'）
-            config (Optional[Dict[str, Any]], optional): アクション固有の設定。デフォルトはNone
-            context_rules (Optional[Dict[str, Any]], optional): コンテキスト抽出のためのルール。デフォルトはNone
-            task_id (Optional[int], optional): 関連するタスクのID。デフォルトはNone
+            task_template_id (Optional[int], optional): 関連するタスクテンプレートのID。デフォルトはNone
 
         Returns:
             Dict[str, Any]: 作成されたアクション
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             action = Action(
                 name=name,
                 action_type=action_type,
-                config=config,
-                context_rules=context_rules,
-                task_id=task_id,
+                task_template_id=task_template_id,
             )
             db.add(action)
             await db.commit()
@@ -65,9 +59,7 @@ class ActionService:
                 "id": action.id,
                 "name": action.name,
                 "action_type": action.action_type,
-                "config": action.config,
-                "context_rules": action.context_rules,
-                "task_id": action.task_id,
+                "task_template_id": action.task_template_id,
                 "is_enabled": action.is_enabled,
                 "created_at": (action.created_at.isoformat() if action.created_at else None),
             }
@@ -81,7 +73,7 @@ class ActionService:
         Returns:
             Optional[Dict[str, Any]]: アクションの詳細
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             action = await db.get(Action, action_id)
             if not action:
                 return None
@@ -90,9 +82,7 @@ class ActionService:
                 "id": action.id,
                 "name": action.name,
                 "action_type": action.action_type,
-                "config": action.config,
-                "context_rules": action.context_rules,
-                "task_id": action.task_id,
+                "task_template_id": action.task_template_id,
                 "is_enabled": action.is_enabled,
                 "created_at": (action.created_at.isoformat() if action.created_at else None),
                 "updated_at": (action.updated_at.isoformat() if action.updated_at else None),
@@ -117,7 +107,7 @@ class ActionService:
         Returns:
             List[Dict[str, Any]]: アクションのリスト
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             query = select(Action)
 
             if action_type is not None:
@@ -136,7 +126,7 @@ class ActionService:
                     "id": action.id,
                     "name": action.name,
                     "action_type": action.action_type,
-                    "task_id": action.task_id,
+                    "task_template_id": action.task_template_id,
                     "is_enabled": action.is_enabled,
                     "created_at": (action.created_at.isoformat() if action.created_at else None),
                     "last_triggered_at": (action.last_triggered_at.isoformat() if action.last_triggered_at else None),
@@ -154,7 +144,7 @@ class ActionService:
         Returns:
             Dict[str, Any]: 実行結果
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             action = await db.get(Action, action_id)
             if not action:
                 return {"success": False, "error": "アクションが見つかりません"}
@@ -162,78 +152,25 @@ class ActionService:
             if not action.is_enabled:
                 return {"success": False, "error": "アクションは無効化されています"}
 
-            # コンテキスト抽出
-            context = self._extract_context(input_data, action.context_rules)
+            # 関連するタスクテンプレートを取得
+            task_template = None
+            if action.task_template_id:
+                task_template = await db.get(TaskTemplate, action.task_template_id)
 
-            # 関連するタスクを取得
-            task = None
-            if action.task_id:
-                task = await db.get(Task, action.task_id)
-
-            if not task:
-                return {"success": False, "error": "関連するタスクが見つかりません"}
+            if not task_template:
+                return {"success": False, "error": "関連するタスクテンプレートが見つかりません"}
 
             # 最終トリガー時刻を更新
             action.last_triggered_at = datetime.now()
             await db.commit()
 
             # タスクを実行
-            result = await self.task_service.create_task(
-                task_type=task.task_type,
-                prompt=task.prompt,
-                context=context,
+            result = await self.task_service.execute_task(
+                template_id=task_template.id,
+                context=input_data,  # 入力データをそのままコンテキストとして使用
                 extensions=None,  # 必要に応じて設定
-                name=f"{action.name}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                parent_id=task.id,
             )
 
             return result
 
-    def _extract_context(self, input_data: Dict[str, Any], context_rules: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """入力データからコンテキストを抽出
-
-        Args:
-            input_data (Dict[str, Any]): 入力データ
-            context_rules (Optional[Dict[str, Any]]): コンテキスト抽出ルール
-
-        Returns:
-            Dict[str, Any]: 抽出されたコンテキスト
-        """
-        # ルールがない場合は入力データをそのまま返す
-        if not context_rules:
-            return input_data
-
-        # ルールに基づいてコンテキストを抽出
-        context = {}
-        for key, rule in context_rules.items():
-            if "source" in rule:
-                # ネストされたフィールドを処理（例: metadata.channel）
-                source_path = rule["source"].split(".")
-                source_value = input_data
-                try:
-                    for path_part in source_path:
-                        if path_part in source_value:
-                            source_value = source_value[path_part]
-                        else:
-                            source_value = None
-                            break
-                except (TypeError, KeyError):
-                    source_value = None
-
-                # 変換処理（必要に応じて）
-                if source_value is not None:
-                    if "transform" in rule and rule["transform"] == "string":
-                        source_value = str(source_value)
-                    elif "transform" in rule and rule["transform"] == "int":
-                        try:
-                            source_value = int(source_value)
-                        except (ValueError, TypeError):
-                            source_value = 0
-
-                    context[key] = source_value
-                elif "default" in rule:
-                    context[key] = rule["default"]
-            elif "default" in rule:
-                context[key] = rule["default"]
-
-        return context
+    # _extract_context メソッドは不要になったため削除

@@ -19,9 +19,7 @@ router = APIRouter(prefix="/api/v1/actions", tags=["アクション"])
 async def create_action(
     name: str,
     action_type: str,
-    config: Optional[Dict[str, Any]] = None,
-    context_rules: Optional[Dict[str, Any]] = None,
-    task_id: Optional[int] = None,
+    task_template_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
 ):
     """アクションを作成するエンドポイント
@@ -29,9 +27,7 @@ async def create_action(
     Args:
         name (str): アクション名
         action_type (str): アクションタイプ（'api', 'discord', 'slack', 'webhook'）
-        config (Optional[Dict[str, Any]], optional): アクション固有の設定。デフォルトはNone
-        context_rules (Optional[Dict[str, Any]], optional): コンテキスト抽出のためのルール。デフォルトはNone
-        task_id (Optional[int], optional): 関連するタスクのID。デフォルトはNone
+        task_template_id (Optional[int], optional): 関連するタスクテンプレートのID。デフォルトはNone
         current_user (User, optional): 現在のユーザー。Depends(get_current_user)から取得
 
     Returns:
@@ -48,9 +44,7 @@ async def create_action(
     result = await action_service.create_action(
         name=name,
         action_type=action_type,
-        config=config,
-        context_rules=context_rules,
-        task_id=task_id,
+        task_template_id=task_template_id,
     )
 
     return result

@@ -9,30 +9,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from api.models.action import Action
-from api.models.task import Task
+from api.models.task_template import TaskTemplate
 
 
 @pytest.mark.asyncio
 async def test_create_action(db_session: AsyncSession):
     """アクションの作成をテスト"""
-    # テスト用のタスクを作成
-    task = Task(
+    # テスト用のタスクテンプレートを作成
+    task_template = TaskTemplate(
+        name="テストテンプレート",
         task_type="test",
         prompt="テスト用プロンプト",
-        context={"test": "data"},
-        status="completed",
     )
-    db_session.add(task)
+    db_session.add(task_template)
     await db_session.commit()
-    await db_session.refresh(task)
+    await db_session.refresh(task_template)
 
     # アクションを作成
     action = Action(
         name="テストアクション",
         action_type="api",
-        config={"endpoint": "/test"},
-        context_rules={"key": {"source": "data", "transform": "string"}},
-        task_id=task.id,
+        task_template_id=task_template.id,
         is_enabled=True,
     )
     db_session.add(action)
@@ -43,42 +40,39 @@ async def test_create_action(db_session: AsyncSession):
     assert action.id is not None
     assert action.name == "テストアクション"
     assert action.action_type == "api"
-    assert action.config == {"endpoint": "/test"}
-    assert action.context_rules == {"key": {"source": "data", "transform": "string"}}
-    assert action.task_id == task.id
+    assert action.task_template_id == task_template.id
     assert action.is_enabled is True
     assert action.created_at is not None
     assert action.last_triggered_at is None
 
 
 @pytest.mark.asyncio
-async def test_action_task_relationship(db_session: AsyncSession):
-    """アクションとタスクのリレーションシップをテスト"""
-    # テスト用のタスクを作成
-    task = Task(
+async def test_action_task_template_relationship(db_session: AsyncSession):
+    """アクションとタスクテンプレートのリレーションシップをテスト"""
+    # テスト用のタスクテンプレートを作成
+    task_template = TaskTemplate(
+        name="関係テスト用テンプレート",
         task_type="test",
         prompt="テスト用プロンプト",
-        context={"test": "data"},
-        status="completed",
     )
-    db_session.add(task)
+    db_session.add(task_template)
     await db_session.commit()
-    await db_session.refresh(task)
+    await db_session.refresh(task_template)
 
     # アクションを作成
-    action = Action(name="テストアクション", action_type="api", task_id=task.id)
+    action = Action(name="テストアクション", action_type="api", task_template_id=task_template.id)
     db_session.add(action)
     await db_session.commit()
     await db_session.refresh(action)
 
     # リレーションシップを検証
-    assert action.task_id == task.id
-    assert action.task.id == task.id
-    assert action.task.task_type == "test"
-    assert action.task.prompt == "テスト用プロンプト"
+    assert action.task_template_id == task_template.id
+    assert action.task_template.id == task_template.id
+    assert action.task_template.task_type == "test"
+    assert action.task_template.prompt == "テスト用プロンプト"
 
-    # タスク側からのリレーションシップを検証 - 明示的にアクションを取得
-    result = await db_session.execute(select(Action).where(Action.task_id == task.id))
+    # タスクテンプレート側からのリレーションシップを検証 - 明示的にアクションを取得
+    result = await db_session.execute(select(Action).where(Action.task_template_id == task_template.id))
     actions = result.scalars().all()
     assert len(actions) == 1
     assert actions[0].id == action.id

@@ -17,6 +17,7 @@ from .database import init_db
 from .routes import (
     actions_router,
     auth_router,
+    discord_config_router,
     discord_router,
     extensions_router,
     health_router,
@@ -54,6 +55,7 @@ app.include_router(tasks_router)
 app.include_router(actions_router)  # 新しいアクションルーター
 app.include_router(extensions_router)
 app.include_router(discord_router)
+app.include_router(discord_config_router)  # Discord設定ルーター
 app.include_router(health_router)
 
 

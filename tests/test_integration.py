@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from api.models.action import Action
-from api.models.task import Task
+from api.models.task_template import TaskTemplate
 from api.services.action_service import ActionService
 from api.services.task_service import TaskService
 
@@ -18,23 +18,21 @@ from api.services.task_service import TaskService
 @pytest.mark.asyncio
 async def test_action_to_task_execution_flow(integration_db_session):
     """アクションからタスク実行までの一連のフローをテスト"""
-    # 1. テスト用のタスク（テンプレート）を作成
-    template_task = Task(
+    # 1. テスト用のタスクテンプレートを作成
+    task_template = TaskTemplate(
         name="テストテンプレート",
         task_type="template",
         prompt="テンプレートプロンプト: {input}",
-        is_template=True,
     )
-    integration_db_session.add(template_task)
+    integration_db_session.add(task_template)
     await integration_db_session.commit()
-    await integration_db_session.refresh(template_task)
+    await integration_db_session.refresh(task_template)
 
     # 2. テスト用のアクションを作成
     action = Action(
         name="統合テストアクション",
         action_type="api",
-        context_rules={"input": {"source": "message"}},
-        task_id=template_task.id,
+        task_template_id=task_template.id,
     )
     integration_db_session.add(action)
     await integration_db_session.commit()
@@ -55,8 +53,8 @@ async def test_action_to_task_execution_flow(integration_db_session):
 
     # get_db関数をモック
     with (
-        patch("api.services.action_service.get_db", side_effect=mock_get_db),
-        patch("api.services.task_service.get_db", side_effect=mock_get_db),
+        patch("api.services.action_service._get_db_context", side_effect=mock_get_db),
+        patch("api.services.task_service._get_db_context", side_effect=mock_get_db),
     ):
         # 3. TaskExecutor.execute_taskをモック
         with patch("goose.executor.TaskExecutor.execute_task") as mock_execute_task:
@@ -84,12 +82,12 @@ async def test_action_to_task_execution_flow(integration_db_session):
 
             # プロンプトとコンテキストが正しく渡されていることを確認
             assert call_args["prompt"] == "テンプレートプロンプト: {input}"
-            assert call_args["context"] == {"input": "テスト入力"}
+            assert call_args["context"] == {"message": "テスト入力"}
 
 
 @pytest.mark.asyncio
-async def test_task_template_and_derived_task(integration_db_session):
-    """タスクテンプレートと派生タスクの連携をテスト"""
+async def test_task_template_and_execution(integration_db_session):
+    """タスクテンプレートと実行の連携をテスト"""
     # get_db関数をモックして、integration_db_sessionを返すようにする
     # 実際のget_db関数と同じように動作するようにする
     from contextlib import asynccontextmanager
@@ -104,7 +102,7 @@ async def test_task_template_and_derived_task(integration_db_session):
             raise
 
     # get_db関数をモック
-    with patch("api.services.task_service.get_db", side_effect=mock_get_db):
+    with patch("api.services.task_service._get_db_context", side_effect=mock_get_db):
         # TaskServiceの実際のインスタンスを使用
         task_service = TaskService()
 
@@ -114,34 +112,31 @@ async def test_task_template_and_derived_task(integration_db_session):
             mock_execute_task.return_value = {
                 "id": "test-id",
                 "success": True,
-                "output": "テンプレートから派生したタスクの実行結果",
+                "output": "テンプレートから実行したタスクの結果",
                 "extensions_output": {},
                 "timestamp": datetime.now().isoformat(),
             }
 
             try:
-                # 1. テンプレートタスクを作成
-                template_result = await task_service.create_task(
+                # 1. タスクテンプレートを作成
+                template_result = await task_service.create_task_template(
                     task_type="template",
                     prompt="共通プロンプト: {param}",
                     name="共通テンプレート",
-                    is_template=True,
+                    description="テスト用テンプレート",
                 )
 
-                template_id = template_result["task_id"]
+                template_id = template_result["template_id"]
 
-                # 2. テンプレートから派生したタスクを作成して実行
-                derived_result = await task_service.create_task(
-                    task_type="derived",
-                    prompt="共通プロンプト: {param}",  # テンプレートと同じプロンプト
-                    context={"param": "派生パラメータ"},
-                    name="派生タスク",
-                    parent_id=template_id,
+                # 2. テンプレートからタスクを実行
+                execution_result = await task_service.execute_task(
+                    template_id=template_id,
+                    context={"param": "実行パラメータ"},
                 )
 
                 # 3. 結果を検証
-                assert derived_result["success"] is True
-                assert derived_result["output"] == "テンプレートから派生したタスクの実行結果"
+                assert execution_result["success"] is True
+                assert execution_result["output"] == "テンプレートから実行したタスクの結果"
 
                 # 4. execute_taskが正しく呼ばれたことを検証
                 mock_execute_task.assert_called_once()
@@ -149,7 +144,7 @@ async def test_task_template_and_derived_task(integration_db_session):
 
                 # プロンプトとコンテキストが正しく渡されていることを確認
                 assert call_args["prompt"] == "共通プロンプト: {param}"
-                assert call_args["context"] == {"param": "派生パラメータ"}
+                assert call_args["context"] == {"param": "実行パラメータ"}
             except Exception as e:
                 print(f"テスト実行中にエラーが発生しました: {e}")
                 raise
@@ -158,24 +153,21 @@ async def test_task_template_and_derived_task(integration_db_session):
 @pytest.mark.asyncio
 async def test_end_to_end_flow_with_mocks(integration_db_session):
     """エンドツーエンドのフローをモックを使用してテスト"""
-    # 1. テスト用のタスクを作成
-    task = Task(
+    # 1. テスト用のタスクテンプレートを作成
+    task_template = TaskTemplate(
         name="E2Eテスト",
         task_type="e2e",
         prompt="E2Eテストプロンプト",
-        context={"initial": "context"},
-        status="completed",
     )
-    integration_db_session.add(task)
+    integration_db_session.add(task_template)
     await integration_db_session.commit()
-    await integration_db_session.refresh(task)
+    await integration_db_session.refresh(task_template)
 
     # 2. テスト用のアクションを作成
     action = Action(
         name="E2Eアクション",
         action_type="webhook",
-        context_rules={"webhook_data": {"source": "data"}},
-        task_id=task.id,
+        task_template_id=task_template.id,
     )
     integration_db_session.add(action)
     await integration_db_session.commit()
@@ -196,13 +188,19 @@ async def test_end_to_end_flow_with_mocks(integration_db_session):
 
     # get_db関数をモック
     with (
-        patch("api.services.action_service.get_db", side_effect=mock_get_db),
-        patch("api.services.task_service.get_db", side_effect=mock_get_db),
+        patch("api.services.action_service._get_db_context", side_effect=mock_get_db),
+        patch("api.services.task_service._get_db_context", side_effect=mock_get_db),
     ):
-        # 3. cli.pyのrun_with_text関数をモック
-        with patch("goose.cli.run_with_text") as mock_run:
+        # 3. TaskExecutor.execute_taskをモック
+        with patch("goose.executor.TaskExecutor.execute_task") as mock_execute_task:
             # モックの戻り値を設定
-            mock_run.return_value = (True, "E2E実行結果", None)
+            mock_execute_task.return_value = {
+                "id": "test-id",
+                "success": True,
+                "output": "E2E実行結果",
+                "extensions_output": {},
+                "timestamp": datetime.now().isoformat(),
+            }
 
             # 4. アクションサービスを使用してアクションをトリガー
             action_service = ActionService()
@@ -212,16 +210,15 @@ async def test_end_to_end_flow_with_mocks(integration_db_session):
 
             # 5. 結果を検証
             assert result["success"] is True
-            assert "task_id" in result
+            assert "template_id" in result
 
-            # 6. run_with_textが正しく呼ばれたことを検証
-            mock_run.assert_called_once()
-            args, kwargs = mock_run.call_args
+            # 6. execute_taskが正しく呼ばれたことを検証
+            mock_execute_task.assert_called_once()
+            call_args = mock_execute_task.call_args[1]
 
-            # プロンプトにコンテキストが含まれていることを確認
-            assert "E2Eテストプロンプト" in args[0]
-            assert "webhook_data" in args[0]
-            assert "Webhookからのデータ" in args[0]
+            # プロンプトとコンテキストが正しく渡されていることを確認
+            assert call_args["prompt"] == "E2Eテストプロンプト"
+            assert call_args["context"] == {"data": "Webhookからのデータ"}
 
             # 7. データベースのアクションが更新されていることを確認
             await integration_db_session.refresh(action)
@@ -245,7 +242,8 @@ async def test_action_api_endpoint_flow():
     with patch("api.services.action_service.ActionService.trigger_action") as mock_trigger:
         # モックの戻り値を設定
         mock_trigger.return_value = {
-            "task_id": 999,
+            "execution_id": 999,
+            "template_id": 1,
             "success": True,
             "output": "APIエンドポイントテスト結果",
         }

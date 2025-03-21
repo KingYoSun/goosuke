@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 
 from ..auth.password import get_password_hash, verify_password
-from ..database import get_db
+from ..database import _get_db_context
 from ..models.user import User
 
 
@@ -32,7 +32,7 @@ class UserService:
             Optional[Dict[str, Any]]: 作成されたユーザー
         """
         if db is None:
-            async with get_db() as session:
+            async with _get_db_context() as session:
                 return await self.create_user(username, email, password, is_admin, session)
 
         # ユーザー名またはメールアドレスが既に存在するか確認
@@ -77,7 +77,7 @@ class UserService:
             Optional[User]: 認証されたユーザー
         """
         if db is None:
-            async with get_db() as session:
+            async with _get_db_context() as session:
                 return await self.authenticate_user(username, password, session)
 
         result = await db.execute(select(User).where(User.username == username))
@@ -100,7 +100,7 @@ class UserService:
         Returns:
             Optional[Dict[str, Any]]: ユーザーの詳細
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             user = await db.get(User, user_id)
             if not user:
                 return None
@@ -123,7 +123,7 @@ class UserService:
         Returns:
             Optional[Dict[str, Any]]: ユーザーの詳細
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             result = await db.execute(select(User).where(User.username == username))
             user = result.scalars().first()
 
@@ -149,7 +149,7 @@ class UserService:
         Returns:
             List[Dict[str, Any]]: ユーザーのリスト
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             result = await db.execute(select(User).order_by(User.id).limit(limit).offset(offset))
             users = result.scalars().all()
 
@@ -184,7 +184,7 @@ class UserService:
         Returns:
             Optional[Dict[str, Any]]: 更新されたユーザー
         """
-        async with get_db() as db:
+        async with _get_db_context() as db:
             user = await db.get(User, user_id)
             if not user:
                 return None

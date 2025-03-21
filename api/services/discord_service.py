@@ -5,7 +5,7 @@ Discord連携サービスモジュール
 """
 
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import BackgroundTasks
 
@@ -13,6 +13,8 @@ from extensions.discord import DiscordService
 from goose.executor import TaskExecutor
 
 from ..config import settings
+from .action_config_service import ActionConfigService
+from .discord_config_service import DiscordConfigService
 from .task_service import TaskService
 
 
@@ -88,6 +90,30 @@ class DiscordBotService:
             "is_running": self._is_running,
             "bot_user": str(self._bot.user) if self._bot and self._bot.user else None,
         }
+
+    async def get_discord_config_for_reaction(self, emoji: str) -> Optional[Dict[str, Any]]:
+        """絵文字に対応するDiscord設定を取得
+
+        Args:
+            emoji (str): リアクション絵文字
+
+        Returns:
+            Optional[Dict[str, Any]]: 対応するDiscord設定（存在しない場合はNone）
+        """
+        discord_config_service = DiscordConfigService()
+        return await discord_config_service.get_discord_config_by_reaction(emoji)
+
+    async def get_action_for_discord_config(self, config_id: int) -> Optional[Dict[str, Any]]:
+        """Discord設定に対応するアクションを取得
+
+        Args:
+            config_id (int): Discord設定ID
+
+        Returns:
+            Optional[Dict[str, Any]]: 対応するアクション（存在しない場合はNone）
+        """
+        action_config_service = ActionConfigService()
+        return await action_config_service.get_action_by_config("discord", config_id)
 
     async def _run_bot(self):
         """Botを実行（バックグラウンドタスク）"""

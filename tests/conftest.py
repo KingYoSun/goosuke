@@ -85,6 +85,10 @@ async def init_test_db():
 @pytest.fixture(scope="session", autouse=True)
 async def setup_test_db():
     """テスト実行前に一度だけデータベースを初期化する"""
+    # マイグレーションを実行してテーブルを作成
+    run_migrations()
+
+    # 初期化
     await init_test_db()
     yield
     # テスト終了後にテーブルを削除する必要はない（インメモリDBなので）
@@ -102,8 +106,11 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     async with TestAsyncSessionLocal() as session:
         # 各テスト関数の実行前にセッションをクリア
         try:
+            await session.execute(text("DELETE FROM action_config"))
+            await session.execute(text("DELETE FROM config_discord"))
             await session.execute(text("DELETE FROM actions"))
-            await session.execute(text("DELETE FROM tasks"))
+            await session.execute(text("DELETE FROM task_executions"))
+            await session.execute(text("DELETE FROM task_templates"))
             await session.execute(text("DELETE FROM users"))
             await session.execute(text("DELETE FROM settings"))
             await session.execute(text("DELETE FROM extensions"))
@@ -161,42 +168,46 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_user() -> User:
+async def test_user(db_session: AsyncSession) -> User:
     """テスト用ユーザーのフィクスチャ"""
-    # 独立したセッションを作成
-    async with TestAsyncSessionLocal() as session:
-        # テスト用ユーザーの作成
-        user = User(
-            username="testuser",
-            email="test@example.com",
-            hashed_password=get_password_hash("password"),
-            is_active=True,
-            is_admin=False,
-        )
+    # 既存のユーザーを削除
+    await db_session.execute(text("DELETE FROM users WHERE username = 'testuser'"))
+    await db_session.commit()
 
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
+    # テスト用ユーザーの作成
+    user = User(
+        username="testuser",
+        email="test@example.com",
+        hashed_password=get_password_hash("password"),
+        is_active=True,
+        is_admin=False,
+    )
 
-        return user
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    return user
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_admin() -> User:
+async def test_admin(db_session: AsyncSession) -> User:
     """テスト用管理者ユーザーのフィクスチャ"""
-    # 独立したセッションを作成
-    async with TestAsyncSessionLocal() as session:
-        # テスト用管理者ユーザーの作成
-        admin = User(
-            username="admin",
-            email="admin@example.com",
-            hashed_password=get_password_hash("adminpassword"),
-            is_active=True,
-            is_admin=True,
-        )
+    # 既存の管理者ユーザーを削除
+    await db_session.execute(text("DELETE FROM users WHERE username = 'admin'"))
+    await db_session.commit()
 
-        session.add(admin)
-        await session.commit()
-        await session.refresh(admin)
+    # テスト用管理者ユーザーの作成
+    admin = User(
+        username="admin",
+        email="admin@example.com",
+        hashed_password=get_password_hash("adminpassword"),
+        is_active=True,
+        is_admin=True,
+    )
 
-        return admin
+    db_session.add(admin)
+    await db_session.commit()
+    await db_session.refresh(admin)
+
+    return admin
