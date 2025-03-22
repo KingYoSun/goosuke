@@ -5,7 +5,6 @@
 """
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -16,29 +15,6 @@ from api.models.extension import Extension
 @pytest.mark.asyncio
 async def test_create_extension(db_session: AsyncSession):
     """拡張機能の作成をテスト"""
-    # テーブルが存在することを確認
-    await db_session.execute(
-        text(
-            """
-    CREATE TABLE IF NOT EXISTS extensions (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR NOT NULL UNIQUE,
-        description TEXT,
-        version VARCHAR,
-        enabled BOOLEAN DEFAULT TRUE,
-        type VARCHAR,
-        cmd VARCHAR,
-        args JSON,
-        timeout INTEGER,
-        envs JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP
-    )
-    """
-        )
-    )
-    await db_session.commit()
-
     # 拡張機能を作成
     extension = Extension(
         name="テスト拡張機能",
@@ -78,29 +54,6 @@ async def test_create_extension(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_update_extension(db_session: AsyncSession):
     """拡張機能の更新をテスト"""
-    # テーブルが存在することを確認
-    await db_session.execute(
-        text(
-            """
-    CREATE TABLE IF NOT EXISTS extensions (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR NOT NULL UNIQUE,
-        description TEXT,
-        version VARCHAR,
-        enabled BOOLEAN DEFAULT TRUE,
-        type VARCHAR,
-        cmd VARCHAR,
-        args JSON,
-        timeout INTEGER,
-        envs JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP
-    )
-    """
-        )
-    )
-    await db_session.commit()
-
     # 拡張機能を作成
     extension = Extension(
         name="更新テスト拡張機能",
@@ -150,29 +103,6 @@ async def test_update_extension(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_query_extensions(db_session: AsyncSession):
     """拡張機能のクエリをテスト"""
-    # テーブルが存在することを確認
-    await db_session.execute(
-        text(
-            """
-    CREATE TABLE IF NOT EXISTS extensions (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR NOT NULL UNIQUE,
-        description TEXT,
-        version VARCHAR,
-        enabled BOOLEAN DEFAULT TRUE,
-        type VARCHAR,
-        cmd VARCHAR,
-        args JSON,
-        timeout INTEGER,
-        envs JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP
-    )
-    """
-        )
-    )
-    await db_session.commit()
-
     # 複数の拡張機能を作成
     extensions = [
         Extension(
@@ -213,7 +143,7 @@ async def test_query_extensions(db_session: AsyncSession):
         assert ext.type == "stdio"
 
     # 有効/無効でフィルタリング
-    result = await db_session.execute(select(Extension).where(Extension.enabled is False))
+    result = await db_session.execute(select(Extension).where(Extension.enabled == False))
     disabled_extensions = result.scalars().all()
     assert len(disabled_extensions) >= 1
     for ext in disabled_extensions:
@@ -230,29 +160,6 @@ async def test_query_extensions(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_extension_string_representation(db_session: AsyncSession):
     """拡張機能の文字列表現をテスト"""
-    # テーブルが存在することを確認
-    await db_session.execute(
-        text(
-            """
-    CREATE TABLE IF NOT EXISTS extensions (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR NOT NULL UNIQUE,
-        description TEXT,
-        version VARCHAR,
-        enabled BOOLEAN DEFAULT TRUE,
-        type VARCHAR,
-        cmd VARCHAR,
-        args JSON,
-        timeout INTEGER,
-        envs JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP
-    )
-    """
-        )
-    )
-    await db_session.commit()
-
     # 拡張機能を作成
     extension = Extension(
         name="文字列表現テスト",
@@ -271,29 +178,6 @@ async def test_extension_string_representation(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_extension_unique_name_constraint(db_session: AsyncSession):
     """拡張機能名の一意性制約をテスト"""
-    # テーブルが存在することを確認
-    await db_session.execute(
-        text(
-            """
-    CREATE TABLE IF NOT EXISTS extensions (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR NOT NULL UNIQUE,
-        description TEXT,
-        version VARCHAR,
-        enabled BOOLEAN DEFAULT TRUE,
-        type VARCHAR,
-        cmd VARCHAR,
-        args JSON,
-        timeout INTEGER,
-        envs JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP
-    )
-    """
-        )
-    )
-    await db_session.commit()
-
     # 1つ目の拡張機能を作成
     extension1 = Extension(
         name="一意性テスト",
