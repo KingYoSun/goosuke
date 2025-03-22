@@ -9,7 +9,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 import yaml
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goose.executor import TaskExecutor
@@ -24,15 +24,13 @@ logger = logging.getLogger(__name__)
 class ExtensionService:
     """拡張機能サービスクラス"""
 
-    def __init__(self, goose_executor: Optional[TaskExecutor] = None, db_session: Optional[AsyncSession] = None):
+    def __init__(self, goose_executor: Optional[TaskExecutor] = None):
         """初期化
 
         Args:
             goose_executor (Optional[TaskExecutor], optional): Goose実行ラッパーインスタンス。デフォルトはNone
-            db_session (Optional[AsyncSession], optional): テスト用のデータベースセッション。デフォルトはNone
         """
         self.goose_executor = goose_executor or TaskExecutor()
-        self.db_session = db_session
 
     async def list_extensions(self) -> List[Dict[str, Any]]:
         """データベースから拡張機能の情報を取得して返す
@@ -40,9 +38,8 @@ class ExtensionService:
         Returns:
             List[Dict[str, Any]]: 拡張機能のリスト
         """
-        if self.db_session:
-            # テスト用のセッションを使用
-            db_extensions = await self._get_db_extensions(self.db_session)
+        async with _get_db_context() as db:
+            db_extensions = await self._get_db_extensions(db)
 
             # 情報を整形
             result = []
@@ -62,29 +59,6 @@ class ExtensionService:
                 result.append(ext_dict)
 
             return result
-        else:
-            # 通常の処理
-            async with _get_db_context() as db:
-                db_extensions = await self._get_db_extensions(db)
-
-                # 情報を整形
-                result = []
-                for ext in db_extensions:
-                    ext_dict = {
-                        "id": ext.id,
-                        "name": ext.name,
-                        "description": ext.description,
-                        "enabled": ext.enabled,
-                        "type": ext.type,
-                        "cmd": ext.cmd,
-                        "args": ext.args,
-                        "timeout": ext.timeout,
-                        "envs": ext.envs,
-                    }
-
-                    result.append(ext_dict)
-
-                return result
 
     async def add_extension(self, extension_data) -> Dict[str, Any]:
         """新しい拡張機能を追加
@@ -95,9 +69,7 @@ class ExtensionService:
         Returns:
             Dict[str, Any]: 追加された拡張機能
         """
-        if self.db_session:
-            # テスト用のセッションを使用
-            db = self.db_session
+        async with _get_db_context() as db:
             # DBに拡張機能情報を追加
             new_extension = Extension(
                 name=extension_data.name,
@@ -113,6 +85,9 @@ class ExtensionService:
             await db.commit()
             await db.refresh(new_extension)
 
+            # 拡張機能の実際のインストールはここで行うか、別の関数で実装
+            # この例では手動でのインストールが必要であることを通知
+
             result = {
                 "id": new_extension.id,
                 "name": new_extension.name,
@@ -125,48 +100,14 @@ class ExtensionService:
                 "envs": new_extension.envs,
             }
 
-            return result
-        else:
-            # 通常の処理
-            async with _get_db_context() as db:
-                # DBに拡張機能情報を追加
-                new_extension = Extension(
-                    name=extension_data.name,
-                    description=extension_data.description,
-                    enabled=extension_data.enabled,
-                    type=extension_data.type,
-                    cmd=extension_data.cmd,
-                    args=extension_data.args,
-                    timeout=extension_data.timeout,
-                    envs=extension_data.envs,
-                )
-                db.add(new_extension)
-                await db.commit()
-                await db.refresh(new_extension)
+            # Goose の設定ファイルに同期
+            try:
+                await self.sync_to_goose()
+                logger.info(f"拡張機能の追加後に Goose の設定ファイルに同期しました: {new_extension.name}")
+            except Exception as e:
+                logger.error(f"拡張機能の追加後の同期中にエラーが発生しました: {e}")
 
-                # 拡張機能の実際のインストールはここで行うか、別の関数で実装
-                # この例では手動でのインストールが必要であることを通知
-
-                result = {
-                    "id": new_extension.id,
-                    "name": new_extension.name,
-                    "description": new_extension.description,
-                    "enabled": new_extension.enabled,
-                    "type": new_extension.type,
-                    "cmd": new_extension.cmd,
-                    "args": new_extension.args,
-                    "timeout": new_extension.timeout,
-                    "envs": new_extension.envs,
-                }
-
-                # Goose の設定ファイルに同期
-                try:
-                    await self.sync_to_goose()
-                    logger.info(f"拡張機能の追加後に Goose の設定ファイルに同期しました: {new_extension.name}")
-                except Exception as e:
-                    logger.error(f"拡張機能の追加後の同期中にエラーが発生しました: {e}")
-
-            return result
+        return result
 
     async def get_extension(self, extension_id: int) -> Optional[Dict[str, Any]]:
         """特定の拡張機能の詳細を取得
@@ -177,9 +118,7 @@ class ExtensionService:
         Returns:
             Optional[Dict[str, Any]]: 拡張機能の詳細
         """
-        if self.db_session:
-            # テスト用のセッションを使用
-            db = self.db_session
+        async with _get_db_context() as db:
             extension = await db.get(Extension, extension_id)
             if not extension:
                 return None
@@ -195,24 +134,6 @@ class ExtensionService:
                 "timeout": extension.timeout,
                 "envs": extension.envs,
             }
-        else:
-            # 通常の処理
-            async with _get_db_context() as db:
-                extension = await db.get(Extension, extension_id)
-                if not extension:
-                    return None
-
-                return {
-                    "id": extension.id,
-                    "name": extension.name,
-                    "description": extension.description,
-                    "enabled": extension.enabled,
-                    "type": extension.type,
-                    "cmd": extension.cmd,
-                    "args": extension.args,
-                    "timeout": extension.timeout,
-                    "envs": extension.envs,
-                }
 
     async def update_extension(self, extension_id: int, update_data) -> Optional[Dict[str, Any]]:
         """拡張機能の設定を更新
@@ -224,9 +145,7 @@ class ExtensionService:
         Returns:
             Optional[Dict[str, Any]]: 更新された拡張機能
         """
-        if self.db_session:
-            # テスト用のセッションを使用
-            db = self.db_session
+        async with _get_db_context() as db:
             extension = await db.get(Extension, extension_id)
             if not extension:
                 return None
@@ -265,56 +184,14 @@ class ExtensionService:
                 "envs": extension.envs,
             }
 
+            # Goose の設定ファイルに同期
+            try:
+                await self.sync_to_goose()
+                logger.info(f"拡張機能の更新後に Goose の設定ファイルに同期しました: {extension.name}")
+            except Exception as e:
+                logger.error(f"拡張機能の更新後の同期中にエラーが発生しました: {e}")
+
             return result
-        else:
-            # 通常の処理
-            async with _get_db_context() as db:
-                extension = await db.get(Extension, extension_id)
-                if not extension:
-                    return None
-
-                # 更新データを適用
-                if hasattr(update_data, "enabled") and update_data.enabled is not None:
-                    extension.enabled = update_data.enabled
-
-                if hasattr(update_data, "type") and update_data.type is not None:
-                    extension.type = update_data.type
-
-                if hasattr(update_data, "cmd") and update_data.cmd is not None:
-                    extension.cmd = update_data.cmd
-
-                if hasattr(update_data, "args") and update_data.args is not None:
-                    extension.args = update_data.args
-
-                if hasattr(update_data, "timeout") and update_data.timeout is not None:
-                    extension.timeout = update_data.timeout
-
-                if hasattr(update_data, "envs") and update_data.envs is not None:
-                    extension.envs = update_data.envs
-
-                await db.commit()
-                await db.refresh(extension)
-
-                result = {
-                    "id": extension.id,
-                    "name": extension.name,
-                    "description": extension.description,
-                    "enabled": extension.enabled,
-                    "type": extension.type,
-                    "cmd": extension.cmd,
-                    "args": extension.args,
-                    "timeout": extension.timeout,
-                    "envs": extension.envs,
-                }
-
-                # Goose の設定ファイルに同期
-                try:
-                    await self.sync_to_goose()
-                    logger.info(f"拡張機能の更新後に Goose の設定ファイルに同期しました: {extension.name}")
-                except Exception as e:
-                    logger.error(f"拡張機能の更新後の同期中にエラーが発生しました: {e}")
-
-                return result
 
     async def remove_extension(self, extension_id: int) -> bool:
         """拡張機能を削除
@@ -325,9 +202,7 @@ class ExtensionService:
         Returns:
             bool: 削除に成功した場合はTrue、それ以外はFalse
         """
-        if self.db_session:
-            # テスト用のセッションを使用
-            db = self.db_session
+        async with _get_db_context() as db:
             extension = await db.get(Extension, extension_id)
             if not extension:
                 return False
@@ -336,26 +211,14 @@ class ExtensionService:
             await db.delete(extension)
             await db.commit()
 
+            # Goose の設定ファイルに同期
+            try:
+                await self.sync_to_goose()
+                logger.info(f"拡張機能の削除後に Goose の設定ファイルに同期しました: {extension_name}")
+            except Exception as e:
+                logger.error(f"拡張機能の削除後の同期中にエラーが発生しました: {e}")
+
             return True
-        else:
-            # 通常の処理
-            async with _get_db_context() as db:
-                extension = await db.get(Extension, extension_id)
-                if not extension:
-                    return False
-
-                extension_name = extension.name
-                await db.delete(extension)
-                await db.commit()
-
-                # Goose の設定ファイルに同期
-                try:
-                    await self.sync_to_goose()
-                    logger.info(f"拡張機能の削除後に Goose の設定ファイルに同期しました: {extension_name}")
-                except Exception as e:
-                    logger.error(f"拡張機能の削除後の同期中にエラーが発生しました: {e}")
-
-                return True
 
     async def install_extension_from_url(self, name: str, url: str, description: str = "") -> Dict[str, Any]:
         """URLから拡張機能をインストール
@@ -375,9 +238,7 @@ class ExtensionService:
         # 手動でのインストールが必要であることを通知
         message = "新しいGoose CLIコマンド体系では拡張機能のインストールコマンドが提供されていません。手動でのインストールが必要です。"
 
-        if self.db_session:
-            # テスト用のセッションを使用
-            db = self.db_session
+        async with _get_db_context() as db:
             # 既存の拡張機能を確認
             result = await db.execute(select(Extension).where(Extension.name == name))
             existing = result.scalars().first()
@@ -406,46 +267,14 @@ class ExtensionService:
                 await db.refresh(new_extension)
                 extension_id = new_extension.id
 
+            # Goose の設定ファイルに同期
+            try:
+                await self.sync_to_goose()
+                logger.info(f"拡張機能のインストール後に Goose の設定ファイルに同期しました: {name}")
+            except Exception as e:
+                logger.error(f"拡張機能のインストール後の同期中にエラーが発生しました: {e}")
+
             return {"success": True, "message": message, "extension_id": extension_id}
-        else:
-            # 通常の処理
-            async with _get_db_context() as db:
-                # 既存の拡張機能を確認
-                result = await db.execute(select(Extension).where(Extension.name == name))
-                existing = result.scalars().first()
-
-                if existing:
-                    # 既存の拡張機能を更新
-                    existing.description = description
-                    await db.commit()
-                    await db.refresh(existing)
-                    extension_id = existing.id
-                else:
-                    # 新しい拡張機能を追加
-                    # URLから拡張機能をインストールする場合は、stdio タイプとして扱う
-                    new_extension = Extension(
-                        name=name,
-                        description=description,
-                        enabled=True,
-                        type="stdio",
-                        cmd="npx",
-                        args=["-y", url],
-                        timeout=300,
-                        envs={},
-                    )
-                    db.add(new_extension)
-                    await db.commit()
-                    await db.refresh(new_extension)
-                    extension_id = new_extension.id
-
-                # Goose の設定ファイルに同期
-                try:
-                    await self.sync_to_goose()
-                    logger.info(f"拡張機能のインストール後に Goose の設定ファイルに同期しました: {name}")
-                except Exception as e:
-                    logger.error(f"拡張機能のインストール後の同期中にエラーが発生しました: {e}")
-
-                return {"success": True, "message": message, "extension_id": extension_id}
 
     async def _get_db_extensions(self, db: AsyncSession) -> List[Extension]:
         """データベースから全ての拡張機能を取得
@@ -456,36 +285,17 @@ class ExtensionService:
         Returns:
             List[Extension]: 拡張機能のリスト
         """
-        # テーブルが存在することを確認
-        try:
-            await db.execute(
-                text(
-                    """
-            CREATE TABLE IF NOT EXISTS extensions (
-                id INTEGER PRIMARY KEY,
-                name VARCHAR NOT NULL UNIQUE,
-                description TEXT,
-                version VARCHAR,
-                enabled BOOLEAN DEFAULT TRUE,
-                type VARCHAR,
-                cmd VARCHAR,
-                args JSON,
-                timeout INTEGER,
-                envs JSON,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP
-            )
-            """
-                )
-            )
-            await db.commit()
-        except Exception as e:
-            logger.error(f"extensionsテーブル作成中にエラーが発生しました: {e}")
-            await db.rollback()
-
+        # テーブル作成処理はconftest.pyで行われるため、ここでは行わない
         # 拡張機能を取得
-        result = await db.execute(select(Extension))
-        return list(result.scalars().all())
+        try:
+            result = await db.execute(select(Extension))
+            extensions = list(result.scalars().all())
+            logger.info(f"拡張機能を{len(extensions)}件取得しました")
+            return extensions
+        except Exception as e:
+            logger.error(f"拡張機能取得中にエラーが発生しました: {e}")
+            # エラーが発生した場合は空のリストを返す
+            return []
 
     async def sync_to_goose(self) -> Dict[str, Any]:
         """Goosuke のデータベースの拡張機能を Goose の設定ファイルに同期する
@@ -507,66 +317,52 @@ class ExtensionService:
             if "extensions" not in config:
                 config["extensions"] = {}
 
-            if self.db_session:
-                # テスト用のセッションを使用
-                db = self.db_session
+            async with _get_db_context() as db:
                 # データベースから全ての拡張機能を取得
                 db_extensions = await self._get_db_extensions(db)
 
-                # テスト用の場合は設定ファイルの保存をスキップ
-                return {
-                    "success": True,
-                    "message": f"テスト用: Goosuke の拡張機能を Goose の設定ファイルに同期しました。{len(db_extensions)}件の拡張機能を同期しました。",
-                    "synced_count": len(db_extensions),
-                }
-            else:
-                # 通常の処理
-                async with _get_db_context() as db:
-                    # データベースから全ての拡張機能を取得
-                    db_extensions = await self._get_db_extensions(db)
+                # データベースの拡張機能を設定ファイルに反映
+                for ext in db_extensions:
+                    key = ext.name.lower().replace(" ", "")
 
-                    # データベースの拡張機能を設定ファイルに反映
-                    for ext in db_extensions:
-                        key = ext.name.lower().replace(" ", "")
+                    # 拡張機能エントリを作成
+                    # 各フィールドを直接 extensions.{key} の下に配置
+                    extension_config = {
+                        "enabled": ext.enabled,
+                        "type": ext.type,
+                    }
 
-                        # 拡張機能エントリを作成
-                        # 各フィールドを直接 extensions.{key} の下に配置
-                        extension_config = {
-                            "enabled": ext.enabled,
-                            "type": ext.type,
-                        }
+                    # 必須でないフィールドは None でない場合のみ追加
+                    if ext.cmd is not None:
+                        extension_config["cmd"] = ext.cmd
 
-                        # 必須でないフィールドは None でない場合のみ追加
-                        if ext.cmd is not None:
-                            extension_config["cmd"] = ext.cmd
+                    if ext.args is not None:
+                        extension_config["args"] = ext.args
 
-                        if ext.args is not None:
-                            extension_config["args"] = ext.args
+                    if ext.timeout is not None:
+                        extension_config["timeout"] = ext.timeout
 
-                        if ext.timeout is not None:
-                            extension_config["timeout"] = ext.timeout
+                    if ext.envs is not None:
+                        extension_config["envs"] = ext.envs
 
-                        if ext.envs is not None:
-                            extension_config["envs"] = ext.envs
+                    # 名前も追加
+                    extension_config["name"] = ext.name
 
-                        # 名前も追加
-                        extension_config["name"] = ext.name
+                    config["extensions"][key] = extension_config
 
-                        config["extensions"][key] = extension_config
+            # 設定ファイルを保存
+            os.makedirs(config_path.parent, exist_ok=True)
+            with open(config_path, "w") as f:
+                yaml.dump(config, f)
 
-                # 設定ファイルを保存
-                os.makedirs(config_path.parent, exist_ok=True)
-                with open(config_path, "w") as f:
-                    yaml.dump(config, f)
-
-                logger.info(
-                    f"Goosuke の拡張機能を Goose の設定ファイルに同期しました。{len(db_extensions)}件の拡張機能を同期しました。"
-                )
-                return {
-                    "success": True,
-                    "message": f"Goosuke の拡張機能を Goose の設定ファイルに同期しました。{len(db_extensions)}件の拡張機能を同期しました。",
-                    "synced_count": len(db_extensions),
-                }
+            logger.info(
+                f"Goosuke の拡張機能を Goose の設定ファイルに同期しました。{len(db_extensions)}件の拡張機能を同期しました。"
+            )
+            return {
+                "success": True,
+                "message": f"Goosuke の拡張機能を Goose の設定ファイルに同期しました。{len(db_extensions)}件の拡張機能を同期しました。",
+                "synced_count": len(db_extensions),
+            }
         except Exception as e:
             logger.error(f"Goose の設定ファイルへの同期中にエラーが発生しました: {e}")
             return {
@@ -599,96 +395,81 @@ class ExtensionService:
 
             synced_count = 0
 
-            if self.db_session:
-                # テスト用のセッションを使用
-                db = self.db_session
+            async with _get_db_context() as db:
                 # データベースから既存の拡張機能を取得
                 db_extensions = await self._get_db_extensions(db)
                 db_extensions_dict = {ext.name: ext for ext in db_extensions}
 
-                # テスト用の場合は簡略化した処理を行う
-                return {
-                    "success": True,
-                    "message": "テスト用: Goose の拡張機能設定を同期しました。0件の拡張機能を同期しました。",
-                    "synced_count": 0,
-                }
-            else:
-                # 通常の処理
-                async with _get_db_context() as db:
-                    # データベースから既存の拡張機能を取得
-                    db_extensions = await self._get_db_extensions(db)
-                    db_extensions_dict = {ext.name: ext for ext in db_extensions}
+                # Goose の拡張機能を Goosuke のデータベースに反映
+                for key, entry in goose_extensions.items():
+                    if not entry.get("enabled", False):
+                        continue
 
-                    # Goose の拡張機能を Goosuke のデータベースに反映
-                    for key, entry in goose_extensions.items():
-                        if not entry.get("enabled", False):
-                            continue
+                    # 設定は直接 entry に含まれている（config キーの下ではない）
+                    # enabled フラグは別途取得
+                    enabled = entry.get("enabled", False)
 
-                        # 設定は直接 entry に含まれている（config キーの下ではない）
-                        # enabled フラグは別途取得
-                        enabled = entry.get("enabled", False)
+                    # 各フィールドを直接取得
+                    extension_type = entry.get("type")
+                    name = entry.get("name", "")
 
-                        # 各フィールドを直接取得
-                        extension_type = entry.get("type")
-                        name = entry.get("name", "")
+                    if not name:
+                        logger.warning(f"拡張機能名が見つかりません: {key}")
+                        continue
 
-                        if not name:
-                            logger.warning(f"拡張機能名が見つかりません: {key}")
-                            continue
+                    if name in db_extensions_dict:
+                        # 既存の拡張機能を更新
+                        ext = db_extensions_dict[name]
+                        ext.enabled = enabled
+                        ext.type = extension_type
 
-                        if name in db_extensions_dict:
-                            # 既存の拡張機能を更新
-                            ext = db_extensions_dict[name]
-                            ext.enabled = enabled
-                            ext.type = extension_type
+                        # 他のフィールドも更新
+                        if "cmd" in entry:
+                            ext.cmd = entry.get("cmd")
+                        if "args" in entry:
+                            ext.args = entry.get("args")
+                        if "timeout" in entry:
+                            ext.timeout = entry.get("timeout")
+                        if "envs" in entry:
+                            ext.envs = entry.get("envs")
 
-                            # 他のフィールドも更新
-                            if "cmd" in entry:
-                                ext.cmd = entry.get("cmd")
-                            if "args" in entry:
-                                ext.args = entry.get("args")
-                            if "timeout" in entry:
-                                ext.timeout = entry.get("timeout")
-                            if "envs" in entry:
-                                ext.envs = entry.get("envs")
-
-                            logger.info(f"拡張機能を更新しました: {name}")
+                        logger.info(f"拡張機能を更新しました: {name}")
+                    else:
+                        # 新しい拡張機能を追加
+                        description = ""
+                        if extension_type == "builtin":
+                            description = f"Goose built-in extension: {name}"
+                        elif extension_type == "stdio":
+                            description = f"Goose stdio extension: {name}"
+                        elif extension_type == "sse":
+                            description = f"Goose SSE extension: {name}"
                         else:
-                            # 新しい拡張機能を追加
-                            description = ""
-                            if extension_type == "builtin":
-                                description = f"Goose built-in extension: {name}"
-                            elif extension_type == "stdio":
-                                description = f"Goose stdio extension: {name}"
-                            elif extension_type == "sse":
-                                description = f"Goose SSE extension: {name}"
-                            else:
-                                description = f"Goose extension: {name}"
+                            description = f"Goose extension: {name}"
 
-                            new_extension = Extension(
-                                name=name,
-                                description=description,
-                                enabled=enabled,
-                                type=extension_type,
-                                cmd=entry.get("cmd"),
-                                args=entry.get("args"),
-                                timeout=entry.get("timeout"),
-                                envs=entry.get("envs"),
-                            )
-                            db.add(new_extension)
-                            logger.info(f"新しい拡張機能を追加しました: {name}")
+                        new_extension = Extension(
+                            name=name,
+                            description=description,
+                            enabled=enabled,
+                            type=extension_type,
+                            cmd=entry.get("cmd"),
+                            args=entry.get("args"),
+                            timeout=entry.get("timeout"),
+                            envs=entry.get("envs"),
+                        )
+                        db.add(new_extension)
+                        logger.info(f"新しい拡張機能を追加しました: {name}")
 
-                        synced_count += 1
+                    synced_count += 1
 
-                    # データベースの変更を保存
-                    await db.commit()
+                # データベースの変更を保存
+                await db.commit()
 
-                logger.info(f"Goose の拡張機能設定の同期が完了しました。{synced_count}件の拡張機能を同期しました。")
-                return {
-                    "success": True,
-                    "message": f"Goose の拡張機能設定を同期しました。{synced_count}件の拡張機能を同期しました。",
-                    "synced_count": synced_count,
-                }
+            logger.info(f"Goose の拡張機能設定の同期が完了しました。{synced_count}件の拡張機能を同期しました。")
+            return {
+                "success": True,
+                "message": f"Goose の拡張機能設定を同期しました。{synced_count}件の拡張機能を同期しました。",
+                "synced_count": synced_count,
+            }
         except Exception as e:
             logger.error(f"拡張機能の同期中にエラーが発生しました: {e}")
             return {"success": False, "message": f"拡張機能の同期中にエラーが発生しました: {str(e)}", "synced_count": 0}

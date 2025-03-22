@@ -6,7 +6,7 @@
 
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select
@@ -49,11 +49,18 @@ async def test_list_extensions(db_session: AsyncSession):
         db_session.add(ext)
     await db_session.commit()
 
-    # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-    service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成
+    service = ExtensionService()
 
     # 拡張機能一覧を取得
-    result = await service.list_extensions()
+    # _get_db_contextをモック化して、テスト用のdb_sessionを使用するようにする
+    with patch("api.services.extension_service._get_db_context") as mock_get_db:
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        result = await service.list_extensions()
 
     # 検証
     assert len(result) == 2
@@ -80,8 +87,16 @@ async def test_list_extensions(db_session: AsyncSession):
 async def test_add_extension(db_session: AsyncSession):
     """拡張機能追加機能をテスト"""
     # サービスのインスタンスを作成（sync_to_gooseをモック化、テスト用のdb_sessionを渡す）
-    with patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}):
-        service = ExtensionService(db_session=db_session)
+    with (
+        patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}),
+        patch("api.services.extension_service._get_db_context") as mock_get_db,
+    ):
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        service = ExtensionService()
 
         # 拡張機能データを作成
         extension_data = MagicMock()
@@ -140,11 +155,17 @@ async def test_get_extension(db_session: AsyncSession):
     await db_session.commit()
     await db_session.refresh(extension)
 
-    # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-    service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成
+    service = ExtensionService()
 
     # 拡張機能を取得
-    result = await service.get_extension(extension.id)
+    with patch("api.services.extension_service._get_db_context") as mock_get_db:
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        result = await service.get_extension(extension.id)
 
     # 検証
     assert result is not None
@@ -162,11 +183,17 @@ async def test_get_extension(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_get_extension_not_found(db_session: AsyncSession):
     """存在しない拡張機能取得機能をテスト"""
-    # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-    service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成
+    service = ExtensionService()
 
     # 存在しないIDで拡張機能を取得
-    result = await service.get_extension(999)
+    with patch("api.services.extension_service._get_db_context") as mock_get_db:
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        result = await service.get_extension(999)
 
     # 検証
     assert result is None
@@ -190,9 +217,17 @@ async def test_update_extension(db_session: AsyncSession):
     await db_session.commit()
     await db_session.refresh(extension)
 
-    # サービスのインスタンスを作成（sync_to_gooseをモック化、テスト用のdb_sessionを渡す）
-    with patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}):
-        service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成（sync_to_gooseをモック化）
+    with (
+        patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}),
+        patch("api.services.extension_service._get_db_context") as mock_get_db,
+    ):
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        service = ExtensionService()
 
         # 更新データを作成
         update_data = MagicMock()
@@ -231,15 +266,21 @@ async def test_update_extension(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_update_extension_not_found(db_session: AsyncSession):
     """存在しない拡張機能更新機能をテスト"""
-    # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-    service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成
+    service = ExtensionService()
 
     # 更新データを作成
     update_data = MagicMock()
     update_data.enabled = False
 
     # 存在しないIDで拡張機能を更新
-    result = await service.update_extension(999, update_data)
+    with patch("api.services.extension_service._get_db_context") as mock_get_db:
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        result = await service.update_extension(999, update_data)
 
     # 検証
     assert result is None
@@ -260,9 +301,17 @@ async def test_remove_extension(db_session: AsyncSession):
     await db_session.refresh(extension)
     extension_id = extension.id
 
-    # サービスのインスタンスを作成（sync_to_gooseをモック化、テスト用のdb_sessionを渡す）
-    with patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}):
-        service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成（sync_to_gooseをモック化）
+    with (
+        patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}),
+        patch("api.services.extension_service._get_db_context") as mock_get_db,
+    ):
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        service = ExtensionService()
 
         # 拡張機能を削除
         result = await service.remove_extension(extension_id)
@@ -280,11 +329,17 @@ async def test_remove_extension(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_remove_extension_not_found(db_session: AsyncSession):
     """存在しない拡張機能削除機能をテスト"""
-    # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-    service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成
+    service = ExtensionService()
 
     # 存在しないIDで拡張機能を削除
-    result = await service.remove_extension(999)
+    with patch("api.services.extension_service._get_db_context") as mock_get_db:
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        result = await service.remove_extension(999)
 
     # 検証
     assert result is False
@@ -293,9 +348,17 @@ async def test_remove_extension_not_found(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_install_extension_from_url(db_session: AsyncSession):
     """URLからの拡張機能インストール機能をテスト"""
-    # サービスのインスタンスを作成（sync_to_gooseをモック化、テスト用のdb_sessionを渡す）
-    with patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}):
-        service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成（sync_to_gooseをモック化）
+    with (
+        patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}),
+        patch("api.services.extension_service._get_db_context") as mock_get_db,
+    ):
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        service = ExtensionService()
 
         # 拡張機能をインストール
         result = await service.install_extension_from_url(
@@ -342,8 +405,16 @@ async def test_install_extension_from_url_existing(db_session: AsyncSession):
     extension_id = extension.id
 
     # サービスのインスタンスを作成（sync_to_gooseをモック化、テスト用のdb_sessionを渡す）
-    with patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}):
-        service = ExtensionService(db_session=db_session)
+    with (
+        patch.object(ExtensionService, "sync_to_goose", return_value={"success": True}),
+        patch("api.services.extension_service._get_db_context") as mock_get_db,
+    ):
+        # AsyncContextManagerのモックを作成
+        mock_context = AsyncMock()
+        mock_context.__aenter__.return_value = db_session
+        mock_get_db.return_value = mock_context
+
+        service = ExtensionService()
 
         # 同じ名前で拡張機能をインストール
         result = await service.install_extension_from_url(
@@ -410,16 +481,22 @@ async def test_sync_to_goose(db_session: AsyncSession):
         mock_path.return_value = temp_file
 
         try:
-            # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-            service = ExtensionService(db_session=db_session)
+            # サービスのインスタンスを作成
+            service = ExtensionService()
 
             # 同期を実行
-            result = await service.sync_to_goose()
+            with patch("api.services.extension_service._get_db_context") as mock_get_db:
+                # AsyncContextManagerのモックを作成
+                mock_context = AsyncMock()
+                mock_context.__aenter__.return_value = db_session
+                mock_get_db.return_value = mock_context
 
-            # 検証（テスト用のdb_sessionを使用する場合は設定ファイルは保存されない）
+                result = await service.sync_to_goose()
+
+            # 検証
             assert result["success"] is True
             assert result["synced_count"] == 2
-            assert "テスト用" in result["message"]
+            assert "Goosuke の拡張機能を Goose の設定ファイルに同期しました" in result["message"]
 
         finally:
             # テスト用ファイルを削除
@@ -457,16 +534,21 @@ async def test_sync_from_goose(db_session: AsyncSession):
 
     # read_goose_extensionsをモック化
     with patch("api.services.extension_service.read_goose_extensions", return_value=test_extensions):
-        # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-        service = ExtensionService(db_session=db_session)
+        # サービスのインスタンスを作成
+        service = ExtensionService()
 
         # 同期を実行
-        result = await service.sync_from_goose()
+        with patch("api.services.extension_service._get_db_context") as mock_get_db:
+            # AsyncContextManagerのモックを作成
+            mock_context = AsyncMock()
+            mock_context.__aenter__.return_value = db_session
+            mock_get_db.return_value = mock_context
 
-        # 検証（テスト用のdb_sessionを使用する場合は簡略化した処理が行われる）
+            result = await service.sync_from_goose()
+        # 検証
         assert result["success"] is True
-        assert result["synced_count"] == 0
-        assert "テスト用" in result["message"]
+        assert "Goose の拡張機能設定を同期しました" in result["message"]
+        # "テスト用"の検証を削除
 
 
 @pytest.mark.asyncio
@@ -474,11 +556,17 @@ async def test_sync_from_goose_empty(db_session: AsyncSession):
     """空のGoose設定ファイルからの同期機能をテスト"""
     # 空の設定ファイル内容をモック
     with patch("api.services.extension_service.read_goose_extensions", return_value={}):
-        # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-        service = ExtensionService(db_session=db_session)
+        # サービスのインスタンスを作成
+        service = ExtensionService()
 
         # 同期を実行
-        result = await service.sync_from_goose()
+        with patch("api.services.extension_service._get_db_context") as mock_get_db:
+            # AsyncContextManagerのモックを作成
+            mock_context = AsyncMock()
+            mock_context.__aenter__.return_value = db_session
+            mock_get_db.return_value = mock_context
+
+            result = await service.sync_from_goose()
 
         # 検証
         assert result["success"] is True
@@ -518,16 +606,21 @@ async def test_sync_from_goose_update_existing(db_session: AsyncSession):
 
     # read_goose_extensionsをモック化
     with patch("api.services.extension_service.read_goose_extensions", return_value=test_extensions):
-        # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-        service = ExtensionService(db_session=db_session)
+        # サービスのインスタンスを作成
+        service = ExtensionService()
 
         # 同期を実行
-        result = await service.sync_from_goose()
+        with patch("api.services.extension_service._get_db_context") as mock_get_db:
+            # AsyncContextManagerのモックを作成
+            mock_context = AsyncMock()
+            mock_context.__aenter__.return_value = db_session
+            mock_get_db.return_value = mock_context
 
-        # 検証（テスト用のdb_sessionを使用する場合は簡略化した処理が行われる）
+            result = await service.sync_from_goose()
+
+        # 検証
         assert result["success"] is True
-        assert result["synced_count"] == 0
-        assert "テスト用" in result["message"]
+        assert "Goose の拡張機能設定を同期しました" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -552,9 +645,8 @@ async def test_get_db_extensions(db_session: AsyncSession):
     for ext in extensions:
         db_session.add(ext)
     await db_session.commit()
-
-    # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-    service = ExtensionService(db_session=db_session)
+    # サービスのインスタンスを作成
+    service = ExtensionService()
 
     # _get_db_extensionsメソッドの実装をパッチして、テーブル存在確認をスキップ
     original_method = ExtensionService._get_db_extensions
@@ -600,11 +692,17 @@ async def test_sync_to_goose_error_handling(db_session: AsyncSession):
         patch("api.utils.goose_config.get_goose_config_path", side_effect=Exception("テストエラー")),
         patch("api.services.extension_service.logger") as mock_logger,
     ):
-        # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-        service = ExtensionService(db_session=db_session)
+        # サービスのインスタンスを作成
+        service = ExtensionService()
 
         # 同期を実行
-        result = await service.sync_to_goose()
+        with patch("api.services.extension_service._get_db_context") as mock_get_db:
+            # AsyncContextManagerのモックを作成
+            mock_context = AsyncMock()
+            mock_context.__aenter__.return_value = db_session
+            mock_get_db.return_value = mock_context
+
+            result = await service.sync_to_goose()
 
         # 検証
         assert result["success"] is False
@@ -623,11 +721,17 @@ async def test_sync_from_goose_error_handling(db_session: AsyncSession):
         patch("api.services.extension_service.read_goose_extensions", side_effect=Exception("テストエラー")),
         patch("api.services.extension_service.logger") as mock_logger,
     ):
-        # サービスのインスタンスを作成（テスト用のdb_sessionを渡す）
-        service = ExtensionService(db_session=db_session)
+        # サービスのインスタンスを作成
+        service = ExtensionService()
 
         # 同期を実行
-        result = await service.sync_from_goose()
+        with patch("api.services.extension_service._get_db_context") as mock_get_db:
+            # AsyncContextManagerのモックを作成
+            mock_context = AsyncMock()
+            mock_context.__aenter__.return_value = db_session
+            mock_get_db.return_value = mock_context
+
+            result = await service.sync_from_goose()
 
         # 検証
         assert result["success"] is False

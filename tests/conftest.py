@@ -43,12 +43,14 @@ TestAsyncSessionLocal = async_sessionmaker(
 async def test_get_db_context():
     """テスト用の非同期データベースセッションを取得するコンテキストマネージャ"""
     async with TestAsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+        # トランザクションを明示的に開始
+        async with session.begin():
+            try:
+                yield session
+                # トランザクションは自動的にコミットされる
+            except Exception:
+                # エラーが発生した場合は自動的にロールバックされる
+                raise
 
 
 # オリジナルの_get_db_contextを保存し、テスト用のものに置き換え
@@ -138,35 +140,21 @@ async def clear_tables(session: AsyncSession):
         "extensions",
     ]
 
-    # extensionsテーブルが存在することを確認
-    await session.execute(
-        text(
-            """
-    CREATE TABLE IF NOT EXISTS extensions (
-        id INTEGER PRIMARY KEY,
-        name VARCHAR NOT NULL UNIQUE,
-        description TEXT,
-        version VARCHAR,
-        enabled BOOLEAN DEFAULT TRUE,
-        type VARCHAR,
-        cmd VARCHAR,
-        args JSON,
-        timeout INTEGER,
-        envs JSON,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP
-    )
-    """
-        )
-    )
-    await session.commit()
+    # テーブルの存在確認
+    result = await session.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+    existing_tables = [row[0] for row in result.fetchall()]
+    print(f"既存のテーブル: {existing_tables}")
 
+    # 存在するテーブルのみをクリア
     for table in tables:
-        try:
-            await session.execute(text(f"DELETE FROM {table}"))
-        except Exception:
-            # テーブルが存在しない場合は無視
-            pass
+        if table in existing_tables:
+            try:
+                await session.execute(text(f"DELETE FROM {table}"))
+                print(f"テーブル {table} をクリアしました")
+            except Exception as e:
+                print(f"テーブル {table} のクリア中にエラーが発生しました: {e}")
+        else:
+            print(f"テーブル {table} は存在しないためスキップします")
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -200,17 +188,22 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await conn.run_sync(Base.metadata.create_all)
 
     # セッションの作成
-    async with TestAsyncSessionLocal() as session:
-        # 各テスト関数の実行前にテーブルをクリア
-        try:
-            await clear_tables(session)
-            await session.commit()
-        except Exception as e:
-            print(f"テーブルクリア中にエラーが発生しました: {e}")
-            await session.rollback()
+    session = TestAsyncSessionLocal()
 
-        # セッションを提供
+    # 各テスト関数の実行前にテーブルをクリア
+    try:
+        await clear_tables(session)
+        await session.commit()
+    except Exception as e:
+        print(f"テーブルクリア中にエラーが発生しました: {e}")
+        await session.rollback()
+        raise
+
+    # セッションを提供
+    try:
         yield session
+    finally:
+        await session.close()
 
 
 @pytest_asyncio.fixture(scope="function")
