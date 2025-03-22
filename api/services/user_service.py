@@ -89,7 +89,7 @@ class UserService:
         if not verify_password(password, user.hashed_password):
             return None
 
-        return user
+        return user  # type: ignore[no-any-return]
 
     async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """ユーザーの詳細を取得

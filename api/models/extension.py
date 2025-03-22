@@ -22,7 +22,14 @@ class Extension(Base):
     description = Column(Text, nullable=True)
     version = Column(String, nullable=True)
     enabled = Column(Boolean, default=True)
-    config = Column(JSON, nullable=True, default={})
+
+    # Goose拡張機能の設定フィールド
+    type = Column(String, nullable=True)  # builtin, stdio, sse
+    cmd = Column(String, nullable=True)  # stdio タイプの場合のコマンド
+    args = Column(JSON, nullable=True)  # stdio タイプの場合の引数
+    timeout = Column(Integer, nullable=True)  # タイムアウト（秒）
+    envs = Column(JSON, nullable=True)  # 環境変数
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -31,4 +38,4 @@ class Extension(Base):
         Returns:
             str: 拡張機能の文字列表現
         """
-        return f"<Extension(id={self.id}, name={self.name}, enabled={self.enabled})>"
+        return f"<Extension(id={self.id}, name={self.name}, type={self.type}, enabled={self.enabled})>"

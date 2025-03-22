@@ -91,3 +91,4 @@ dmypy.json
 # プロジェクト固有の除外ファイル
 # 例: 大きなデータファイルなど
 # data/large_files/
+clones/

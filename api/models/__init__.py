@@ -18,8 +18,8 @@ __all__ = [
     "TaskTemplate",
     "TaskExecution",
     "Action",
+    "Extension",
     "ActionConfig",
     "ConfigDiscord",
-    "Extension",
     "Setting",
 ]

@@ -133,3 +133,6 @@ goose-config/*
 # 一時ファイル
 tmp/
 temp/
+
+# コンテキスト用リポジトリクローンフォルダ
+clones/

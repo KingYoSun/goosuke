@@ -73,6 +73,25 @@ async def startup_event():
     else:
         logger.info("Skipping automatic database initialization in non-development mode")
 
+    # Goose の拡張機能設定を同期
+    try:
+        from .services.extension_service import ExtensionService
+
+        extension_service = ExtensionService()
+        result = await extension_service.sync_from_goose()
+        if result["success"]:
+            logger.info(f"GooseからGoosukeへの拡張機能の同期が完了しました: {result['synced_count']}件")
+        else:
+            logger.warning(f"GooseからGoosukeへの拡張機能の同期に失敗しました: {result['message']}")
+
+        result = await extension_service.sync_to_goose()
+        if result["success"]:
+            logger.info(f"GoosukeからGooseへの拡張機能の同期が完了しました: {result['synced_count']}件")
+        else:
+            logger.warning(f"GoosukeからGooseへの拡張機能の同期に失敗しました: {result['message']}")
+    except Exception as e:
+        logger.error(f"拡張機能の同期中にエラーが発生しました: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():

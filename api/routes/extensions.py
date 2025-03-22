@@ -26,7 +26,13 @@ class ExtensionBase(BaseModel):
 class ExtensionCreate(ExtensionBase):
     """拡張機能作成モデル"""
 
-    config: Dict[str, Any] = {}
+    type: str  # builtin, stdio, sse
+    enabled: bool = True
+    # stdio タイプの場合のフィールド
+    cmd: Optional[str] = None
+    args: Optional[List[str]] = None
+    timeout: Optional[int] = None
+    envs: Optional[Dict[str, str]] = None
 
 
 class ExtensionResponse(ExtensionBase):
@@ -34,16 +40,27 @@ class ExtensionResponse(ExtensionBase):
 
     id: int
     enabled: bool
-    config: Dict[str, Any] = {}
+    type: str
     version: Optional[str] = None
-    path: Optional[str] = None
+    # stdio タイプの場合のフィールド
+    cmd: Optional[str] = None
+    args: Optional[List[str]] = None
+    timeout: Optional[int] = None
+    envs: Optional[Dict[str, str]] = None
 
 
 class ExtensionUpdate(BaseModel):
     """拡張機能更新モデル"""
 
+    id: int
+    name: Optional[str] = None
+    description: Optional[str] = None
     enabled: Optional[bool] = None
-    config: Optional[Dict[str, Any]] = None
+    type: Optional[str] = None
+    cmd: Optional[str] = None
+    args: Optional[List[str]] = None
+    timeout: Optional[int] = None
+    envs: Optional[Dict[str, str]] = None
 
 
 @router.get("/", response_model=List[ExtensionResponse])

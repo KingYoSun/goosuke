@@ -9,9 +9,14 @@ ARG GOOSE_MODEL
 RUN apt-get update && apt-get install -y \
     curl \
     git \
+    nodejs \
+    npm \
     bzip2 \
     libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
+
+# Node.jsとnpmのバージョンを確認
+RUN node -v && npm -v
 
 # 依存関係のインストール
 COPY requirements.txt .

@@ -3,12 +3,14 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      args:
+        - GOOSE_PROVIDER=${GOOSE_PROVIDER}
+        - GOOSE_MODEL=${GOOSE_MODEL}
     ports:
       - "8000:8000"
     volumes:
       - ./:/app
       - ./db:/app/db
-      - ./goose-config:/home/goosuke/.config/goose
     env_file:
       - .env
     networks:

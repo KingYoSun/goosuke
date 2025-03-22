@@ -27,7 +27,8 @@ RUN pip install --no-cache-dir \
     autoflake \
     httpx \
     types-passlib \
-    types-python-jose
+    types-python-jose \
+    types-PyYAML
 
 # テストステージ - テスト実行用
 FROM dev AS test
@@ -45,7 +46,7 @@ FROM dev AS lint
 COPY . .
 
 # リント実行コマンド
-CMD ["sh", "-c", "flake8 . && mypy --ignore-missing-imports --disable-error-code attr-defined --disable-error-code assignment --disable-error-code arg-type --disable-error-code union-attr --disable-error-code call-overload --disable-error-code type-var --disable-error-code no-any-return . && black --check . && isort --check-only --profile black ."]
+CMD ["sh", "-c", "flake8 . && mypy --config-file pyproject.toml . && black --check . && isort --check-only --profile black ."]
 
 # フォーマットステージ - コード自動整形用
 FROM dev AS format
