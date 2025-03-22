@@ -26,6 +26,7 @@ Goosuke は以下の技術スタックを使用しています：
 
 ### 設定管理
 - **環境変数**: python-dotenv 1.0.0以上
+- **YAML処理**: PyYAML
 
 ### データ検証
 - **スキーマ検証**: Pydantic 2.0.0以上
@@ -38,6 +39,8 @@ Goosuke は以下の技術スタックを使用しています：
 ### テスト
 - **テストフレームワーク**: pytest
 - **コードカバレッジ**: pytest-cov
+- **非同期テスト**: pytest-asyncio
+- **テストデータベース**: SQLite（インメモリ）
 
 ### コード品質
 - **リンター**: flake8
@@ -90,6 +93,7 @@ goosuke/
 │   ├── models/         # データベースモデル
 │   ├── routes/         # APIルート
 │   ├── services/       # ビジネスロジック
+│   ├── utils/          # ユーティリティ関数
 │   └── docs/           # APIドキュメント
 ├── goose/              # 実行レイヤー（Goose CLI とカスタマイズ）
 │   ├── __init__.py
@@ -120,6 +124,7 @@ goosuke/
 │   ├── projectbrief.md
 │   ├── systemPatterns.md
 │   └── techContext.md
+├── clones/             # コンテキスト用リポジトリクローンフォルダ
 ├── .env.example        # 環境変数の例
 ├── .flake8             # flake8設定
 ├── .gitignore          # Gitの除外ファイル
@@ -137,6 +142,7 @@ goosuke/
 - **SQLite**: 小規模用途向け
 - **非同期接続**: aiosqliteを使用
 - **マイグレーション**: 起動時に自動実行
+- **トランザクション管理**: 非同期コンテキストマネージャを使用
 
 ### 認証
 - **JWT**: シンプルなJWTベースの認証
@@ -158,6 +164,12 @@ goosuke/
 - **ヘルスチェック**: コンテナのヘルスチェック
 - **環境変数**: 設定は環境変数で注入
 
+### 拡張機能
+- **タイプ**: builtin（組み込み）、stdio（標準入出力）、sse（Server-Sent Events）
+- **設定同期**: GoosukeとGoose間で設定を同期
+- **環境変数**: 拡張機能ごとに環境変数を設定可能
+- **タイムアウト**: 拡張機能の実行タイムアウトを設定可能
+
 ## 依存関係
 
 ```
@@ -171,6 +183,7 @@ aiohttp>=3.8.5
 discord.py>=2.3.0
 python-dotenv>=1.0.0
 passlib>=1.7.4
+pyyaml
 ```
 
 ## 開発ツール設定
@@ -178,9 +191,9 @@ passlib>=1.7.4
 ### flake8 (.flake8)
 ```
 [flake8]
-max-line-length = 88
-extend-ignore = E203, W503
-exclude = .git,__pycache__,build,dist
+max-line-length = 120
+extend-ignore = E203, W503, F841
+exclude = .git,__pycache__,build,dist,clones
 per-file-ignores = __init__.py:F401
 ```
 
@@ -302,9 +315,98 @@ APIは `/api/v1/health` エンドポイントを提供し、システムの状�
 - **単体テスト**: モデル、サービス、ユーティリティのテスト
 - **統合テスト**: 発火レイヤーと実行レイヤーの連携テスト
 - **APIテスト**: エンドポイント、認証、ヘルスチェックのテスト
+- **モック最小化**: goose CLIとテスト用モックDB以外のモックは最小限に抑える
+- **トランザクション活用**: テスト間の独立性を確保するためにトランザクションを活用
+- **共通セットアップ**: テストコードの保守性を高めるために共通のセットアップコードを集約
+
+### テストデータベース接続パターン
+```python
+@asynccontextmanager
+async def test_get_db_context():
+    async with TestAsyncSessionLocal() as session:
+        async with session.begin():
+            yield session
+            # トランザクションは自動的にロールバックされる
+```
+
+### テスト用テーブル作成パターン
+```python
+# テーブルが存在することを確認
+async def ensure_table_exists(session, table_name, create_table_sql):
+    # テーブルの存在確認
+    result = await session.execute(text(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"))
+    if result.scalar() is None:
+        # テーブルが存在しない場合は作成
+        await session.execute(text(create_table_sql))
+        await session.commit()
+```
+
+### テスト用データベース初期化パターン
+```python
+# テスト用データベースを初期化する関数
+async def init_test_db():
+    # テーブルの作成
+    async with test_engine.begin() as conn:
+        # 既存のテーブルを削除
+        await conn.run_sync(Base.metadata.drop_all)
+        # テーブルを作成
+        await conn.run_sync(Base.metadata.create_all)
+        
+        # 追加のテーブル作成（モデルに定義されていないテーブル）
+        for table_name, create_table_sql in ADDITIONAL_TABLES.items():
+            await ensure_table_exists(conn, table_name, create_table_sql)
+```
 
 ### コードカバレッジ
 テスト実行時にカバレッジレポートが生成されます。
 
 ### CI/CD
 GitHub Actionsを使用して、プッシュやプルリクエスト時に自動的にテストとリントが実行されます。
+
+## 拡張機能モデル
+
+拡張機能モデルは以下のフィールドで構成されています：
+
+```python
+class Extension(Base):
+    __tablename__ = "extensions"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True, unique=True)
+    description = Column(Text, nullable=True)
+    version = Column(String, nullable=True)
+    enabled = Column(Boolean, default=True)
+    
+    # Goose拡張機能の設定フィールド
+    type = Column(String, nullable=True)  # builtin, stdio, sse
+    cmd = Column(String, nullable=True)  # stdio タイプの場合のコマンド
+    args = Column(JSON, nullable=True)  # stdio タイプの場合の引数
+    timeout = Column(Integer, nullable=True)  # タイムアウト（秒）
+    envs = Column(JSON, nullable=True)  # 環境変数
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+```
+
+### 拡張機能タイプ
+- **builtin**: Gooseに組み込まれた拡張機能
+- **stdio**: 標準入出力を使用する外部プロセスとして実行される拡張機能
+- **sse**: Server-Sent Events（SSE）を使用するHTTPベースの拡張機能
+
+### Goose設定同期
+GoosukeとGoose間の設定同期は、`api/utils/goose_config.py`モジュールを使用して行われます：
+
+```python
+def get_goose_config_path() -> Path:
+    """Goose の設定ファイルのパスを取得する"""
+    # ...
+
+def read_goose_config() -> Dict[str, Any]:
+    """Goose の設定ファイルを読み取る"""
+    # ...
+
+def read_goose_extensions() -> Dict[str, Any]:
+    """Goose の設定ファイルから拡張機能の設定を読み取る"""
+    # ...
+```
+
+これらの関数を使用して、`ExtensionService`クラスの`sync_from_goose`メソッドと`sync_to_goose`メソッドが実装されています。
