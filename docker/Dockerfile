@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 # Node.jsとnpmのバージョンを確認
 RUN node -v && npm -v
 
