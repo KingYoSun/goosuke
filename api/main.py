@@ -22,6 +22,7 @@ from .routes import (
     extensions_router,
     health_router,
     tasks_router,
+    settings_router
 )
 
 # ロガーの設定
@@ -56,6 +57,7 @@ app.include_router(actions_router)  # 新しいアクションルーター
 app.include_router(extensions_router)
 app.include_router(discord_router)
 app.include_router(discord_config_router)  # Discord設定ルーター
+app.include_router(settings_router)  # 設定ルーター
 app.include_router(health_router)
 
 

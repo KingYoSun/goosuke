@@ -4,7 +4,7 @@
 このモジュールは、アプリケーション設定を管理するデータモデルを定義します。
 """
 
-from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 
 from ..database import Base
@@ -21,6 +21,7 @@ class Setting(Base):
     key = Column(String, unique=True, index=True, nullable=False)
     value = Column(JSON, nullable=True)
     description = Column(Text, nullable=True)
+    is_secret = Column(Boolean, default=False)  # 秘密情報かどうか
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

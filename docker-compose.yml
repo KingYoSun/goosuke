@@ -16,8 +16,8 @@ services:
     networks:
       - goosuke-network
     restart: unless-stopped
-    # コンテナ内のPATHを確認するためのコマンド
-    # command: bash -c "echo $$PATH && which goose || echo 'goose not found' && uvicorn api.main:app --host 0.0.0.0 --port 8000"
+    # デバッグモードでアプリケーションを起動
+    command: bash -c "python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --log-level debug"
 
 networks:
   goosuke-network:

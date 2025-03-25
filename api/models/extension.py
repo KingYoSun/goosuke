@@ -29,6 +29,7 @@ class Extension(Base):
     args = Column(JSON, nullable=True)  # stdio タイプの場合の引数
     timeout = Column(Integer, nullable=True)  # タイムアウト（秒）
     envs = Column(JSON, nullable=True)  # 環境変数
+    secrets = Column(JSON, nullable=True)  # 秘密情報のキーリスト
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

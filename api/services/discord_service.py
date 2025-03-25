@@ -54,18 +54,29 @@ class DiscordBotService:
         Args:
             background_tasks (BackgroundTasks): バックグラウンドタスク
         """
-        if not settings.DISCORD_BOT_TOKEN:
-            self.logger.error("Discord Botトークンが設定されていません")
-            return {
-                "success": False,
-                "message": "Discord Botトークンが設定されていません",
-            }
+        # 設定からDiscord Botトークンを取得
+        from ..services.setting_service import SettingService
+
+        setting_service = SettingService()
+        discord_token_setting = await setting_service.get_setting_by_key("DISCORD_BOT_TOKEN")
+
+        # 設定からトークンを取得できない場合は環境変数を使用
+        if not discord_token_setting or not discord_token_setting["value"]:
+            if not settings.DISCORD_BOT_TOKEN:
+                self.logger.error("Discord Botトークンが設定されていません")
+                return {
+                    "success": False,
+                    "message": "Discord Botトークンが設定されていません",
+                }
+            discord_token = settings.DISCORD_BOT_TOKEN
+        else:
+            discord_token = discord_token_setting["value"]
 
         if self._is_running:
             return {"success": True, "message": "Discord Botは既に実行中です"}
 
         # バックグラウンドでBotを起動
-        background_tasks.add_task(self._run_bot)
+        background_tasks.add_task(self._run_bot, discord_token)
 
         return {"success": True, "message": "Discord Botを起動しています"}
 
@@ -115,10 +126,14 @@ class DiscordBotService:
         action_config_service = ActionConfigService()
         return await action_config_service.get_action_by_config("discord", config_id)
 
-    async def _run_bot(self):
-        """Botを実行（バックグラウンドタスク）"""
+    async def _run_bot(self, token: str):
+        """Botを実行（バックグラウンドタスク）
+
+        Args:
+            token (str): Discord Botトークン
+        """
         try:
-            self._bot = DiscordService(settings.DISCORD_BOT_TOKEN, self.goose_executor)
+            self._bot = DiscordService(token, self.goose_executor)
             self._is_running = True
 
             self.logger.info("Discord Botを起動しています...")

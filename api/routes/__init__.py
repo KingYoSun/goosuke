@@ -10,6 +10,7 @@ from .discord import router as discord_router
 from .discord_config import router as discord_config_router
 from .extensions import router as extensions_router
 from .health import router as health_router
+from .settings import router as settings_router
 from .tasks import router as tasks_router
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "discord_router",
     "discord_config_router",
     "health_router",
+    "settings_router",
 ]

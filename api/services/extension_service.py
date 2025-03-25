@@ -343,7 +343,28 @@ class ExtensionService:
                         extension_config["timeout"] = ext.timeout
 
                     if ext.envs is not None:
-                        extension_config["envs"] = ext.envs
+                        extension_config["envs"] = ext.envs.copy() if isinstance(ext.envs, dict) else {}
+                    else:
+                        extension_config["envs"] = {}
+
+                    # 秘密情報の設定
+                    try:
+                        if ext.secrets is not None and isinstance(ext.secrets, list):
+                            # 秘密情報のキーリストから値を取得
+                            # 循環インポートを避けるため、必要な時だけインポート
+                            from ..services.setting_service import SettingService
+
+                            setting_service = SettingService()
+
+                            for secret_key in ext.secrets:
+                                # 設定値を取得
+                                setting = await setting_service.get_setting_by_key(secret_key)
+                                if setting and setting["value"] is not None:
+                                    # 値を拡張機能の環境変数に追加
+                                    extension_config["envs"][secret_key] = setting["value"]
+                                    logger.info(f"拡張機能 {ext.name} に秘密情報 {secret_key} を設定しました")
+                    except Exception as e:
+                        logger.error(f"拡張機能 {ext.name} の秘密情報処理中にエラーが発生しました: {e}")
 
                     # 名前も追加
                     extension_config["name"] = ext.name
