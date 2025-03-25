@@ -33,6 +33,7 @@ class ExtensionCreate(ExtensionBase):
     args: Optional[List[str]] = None
     timeout: Optional[int] = None
     envs: Optional[Dict[str, str]] = None
+    secrets: Optional[List[str]] = None
 
 
 class ExtensionResponse(ExtensionBase):
@@ -47,6 +48,7 @@ class ExtensionResponse(ExtensionBase):
     args: Optional[List[str]] = None
     timeout: Optional[int] = None
     envs: Optional[Dict[str, str]] = None
+    secrets: Optional[List[str]] = None
 
 
 class ExtensionUpdate(BaseModel):
@@ -61,6 +63,7 @@ class ExtensionUpdate(BaseModel):
     args: Optional[List[str]] = None
     timeout: Optional[int] = None
     envs: Optional[Dict[str, str]] = None
+    secrets: Optional[List[str]] = None
 
 
 @router.get("/", response_model=List[ExtensionResponse])

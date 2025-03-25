@@ -17,7 +17,7 @@ services:
       - goosuke-network
     restart: unless-stopped
     # デバッグモードでアプリケーションを起動
-    command: bash -c "python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --log-level debug"
+    command: bash -c "python -B -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --log-level debug"
 
 networks:
   goosuke-network:

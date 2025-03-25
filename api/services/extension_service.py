@@ -54,6 +54,7 @@ class ExtensionService:
                     "args": ext.args,
                     "timeout": ext.timeout,
                     "envs": ext.envs,
+                    "secrets": ext.secrets,
                 }
 
                 result.append(ext_dict)
@@ -80,6 +81,7 @@ class ExtensionService:
                 args=extension_data.args,
                 timeout=extension_data.timeout,
                 envs=extension_data.envs,
+                secrets=extension_data.secrets,
             )
             db.add(new_extension)
             await db.commit()
@@ -98,6 +100,7 @@ class ExtensionService:
                 "args": new_extension.args,
                 "timeout": new_extension.timeout,
                 "envs": new_extension.envs,
+                "secrets": new_extension.secrets,
             }
 
             # Goose の設定ファイルに同期
@@ -133,6 +136,7 @@ class ExtensionService:
                 "args": extension.args,
                 "timeout": extension.timeout,
                 "envs": extension.envs,
+                "secrets": extension.secrets,
             }
 
     async def update_extension(self, extension_id: int, update_data) -> Optional[Dict[str, Any]]:
@@ -169,6 +173,9 @@ class ExtensionService:
             if hasattr(update_data, "envs") and update_data.envs is not None:
                 extension.envs = update_data.envs
 
+            if hasattr(update_data, "secrets") and update_data.secrets is not None:
+                extension.secrets = update_data.secrets
+
             await db.commit()
             await db.refresh(extension)
 
@@ -182,6 +189,7 @@ class ExtensionService:
                 "args": extension.args,
                 "timeout": extension.timeout,
                 "envs": extension.envs,
+                "secrets": extension.secrets,
             }
 
             # Goose の設定ファイルに同期
@@ -261,6 +269,7 @@ class ExtensionService:
                     args=["-y", url],
                     timeout=300,
                     envs={},
+                    secrets=[],
                 )
                 db.add(new_extension)
                 await db.commit()
