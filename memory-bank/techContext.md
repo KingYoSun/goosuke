@@ -18,6 +18,7 @@ Goosuke は以下の技術スタックを使用しています：
 - **認証**: JWT（JSON Web Token）
 - **JWT実装**: python-jose 3.3.0以上
 - **パスワードハッシュ**: passlib 1.7.4以上
+- **暗号化**: cryptography 3.4.7以上（秘密情報の暗号化）
 
 ### 外部連携
 - **HTTP クライアント**: aiohttp 3.8.5以上
@@ -25,6 +26,7 @@ Goosuke は以下の技術スタックを使用しています：
 
 ### 設定管理
 - **環境変数**: python-dotenv 1.0.0以上
+- **設定ファイル**: YAML（Goose設定）
 
 ### データ検証
 - **スキーマ検証**: Pydantic 2.0.0以上
@@ -38,7 +40,7 @@ Goosuke は以下の技術スタックを使用しています：
 - **テストフレームワーク**: pytest
 - **コードカバレッジ**: pytest-cov
 - **非同期テスト**: pytest-asyncio
-- **テストデータベース**: SQLite（インメモリ）
+- **テストデータベース**: SQLite（インメモリ/ファイル）
 
 ### コード品質
 - **リンター**: flake8
@@ -104,6 +106,7 @@ goosuke/
 - **非同期接続**: aiosqliteを使用
 - **マイグレーション**: 起動時に自動実行
 - **トランザクション管理**: 非同期コンテキストマネージャを使用
+- **テスト環境**: テスト用に専用のデータベースファイルを使用
 
 ### 認証
 - **JWT**: シンプルなJWTベースの認証
@@ -125,6 +128,14 @@ goosuke/
 - **設定同期**: GoosukeとGoose間で設定を同期
 - **環境変数**: 拡張機能ごとに環境変数を設定可能
 - **タイムアウト**: 拡張機能の実行タイムアウトを設定可能
+- **秘密情報**: 拡張機能に関連する秘密情報のキーリストを管理
+
+### 秘密情報管理
+- **暗号化アルゴリズム**: Fernet（対称暗号化）
+- **キー生成**: SECRET_KEYからPBKDF2を使用して暗号化キーを生成
+- **保存形式**: JSON形式に変換後、暗号化してBase64エンコード
+- **マスキング**: API応答では秘密情報を「********」でマスク表示
+- **エラーハンドリング**: 暗号化・復号化エラー時のフォールバック処理
 
 ## 環境変数
 
@@ -140,17 +151,13 @@ LOG_LEVEL=info
 DATABASE_URL=sqlite:///db/sqlite.db
 
 # 認証設定
-SECRET_KEY=your-secret-key
+SECRET_KEY=your-secret-key  # JWT認証と秘密情報暗号化に使用
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
-
-# Discord設定
-DISCORD_BOT_TOKEN=your-discord-bot-token
-DISCORD_GUILD_ID=your-discord-guild-id
 
 # Goose設定
 GOOSE_PROVIDER=anthropic
 GOOSE_MODEL=claude-3-7-sonnet-latest
-ANTHROPIC_API_KEY=your-anthropic-api-key
+ANTHROPIC_API_KEY=your-anthropic-api-key  # 秘密情報として暗号化管理
 ```
 
 ## テスト戦略
@@ -161,6 +168,7 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 - **モック最小化**: goose CLIとテスト用モックDB以外のモックは最小限に抑える
 - **トランザクション活用**: テスト間の独立性を確保するためにトランザクションを活用
 - **共通セットアップ**: テストコードの保守性を高めるために共通のセットアップコードを集約
+- **秘密情報テスト**: 暗号化・復号化機能の正常動作を確認するテスト
 
 ### テストデータベース接続パターン
 ```python
@@ -184,10 +192,25 @@ class Extension(Base):
     description = Column(Text, nullable=True)
     version = Column(String, nullable=True)
     enabled = Column(Boolean, default=True)
-    
+
     # Goose拡張機能の設定フィールド
     type = Column(String, nullable=True)  # builtin, stdio, sse
     cmd = Column(String, nullable=True)  # stdio タイプの場合のコマンド
     args = Column(JSON, nullable=True)  # stdio タイプの場合の引数
     timeout = Column(Integer, nullable=True)  # タイムアウト（秒）
     envs = Column(JSON, nullable=True)  # 環境変数
+    secrets = Column(JSON, nullable=True)  # 秘密情報のキーリスト
+```
+
+## 設定モデル
+
+設定モデルは以下のフィールドで構成されています：
+
+```python
+class Setting(Base):
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, index=True, nullable=False)
+    value = Column(JSON, nullable=True)
+    description = Column(Text, nullable=True)
+    is_secret = Column(Boolean, default=False)  # 秘密情報かどうか

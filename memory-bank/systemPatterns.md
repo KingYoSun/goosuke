@@ -98,6 +98,7 @@ Goosuke は以下のレイヤーで構成されています：
 - **TaskService**: タスク管理
 - **ExtensionService**: 拡張機能管理
 - **DiscordService**: Discord連携
+- **SettingService**: 設定管理と秘密情報の処理
 
 ### 4. 依存性注入パターン
 
@@ -117,6 +118,29 @@ async def _get_db_context():
         except Exception:
             await session.rollback()
             raise
+```
+
+### 6. 秘密情報管理パターン
+
+APIキーやトークンなどの秘密情報を安全に管理するためのパターンを実装しています：
+
+- **秘密情報フラグ**: 設定に`is_secret`フラグを設け、秘密情報かどうかを識別
+- **暗号化・復号化**: 秘密情報は保存時に暗号化し、使用時に復号化
+- **マスキング**: API応答では秘密情報を「********」でマスク表示
+- **拡張機能との連携**: 拡張機能に関連する秘密情報のキーリストを管理
+
+```python
+# 秘密情報の暗号化
+def encrypt_value(value):
+    f = Fernet(_get_encryption_key())
+    encrypted = f.encrypt(json.dumps(value).encode())
+    return base64.urlsafe_b64encode(encrypted).decode()
+
+# 秘密情報の復号化
+def decrypt_value(encrypted_value):
+    f = Fernet(_get_encryption_key())
+    decrypted = f.decrypt(base64.urlsafe_b64decode(encrypted_value))
+    return json.loads(decrypted.decode())
 ```
 
 ## データフロー
@@ -141,3 +165,13 @@ async def _get_db_context():
 3. 読み取った設定をGoosukeのデータベースに反映する
 4. `sync_to_goose`メソッドを呼び出し、Goosukeのデータベースから拡張機能設定を読み取る
 5. 読み取った設定をGooseの設定ファイルに反映する
+
+### 秘密情報管理フロー
+
+1. ユーザーが設定を作成または更新する際に`is_secret`フラグを設定
+2. `SettingService`が設定を保存する前に、`is_secret`がtrueの場合は値を暗号化
+3. データベースには暗号化された値が保存される
+4. 設定一覧を取得する際、`is_secret`がtrueの設定は値が「********」でマスク表示される
+5. 個別の設定を取得する際、`is_secret`がtrueの設定は値が自動的に復号化される
+6. 拡張機能が秘密情報を使用する場合、`secrets`フィールドに秘密情報のキーリストを保持
+7. 拡張機能の実行時、必要な秘密情報が自動的に復号化されて提供される
