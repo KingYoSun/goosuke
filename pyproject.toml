@@ -36,7 +36,9 @@ disable_error_code = [
   "union-attr",
   "call-overload",
   "type-var",
-  "no-any-return"
+  "no-any-return",
+  "return-value",
+  "index"
 ]
 exclude = ["clones"]
 

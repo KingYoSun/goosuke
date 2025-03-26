@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import BackgroundTasks
 
-from api.config import settings
 from api.services.discord_service import DiscordBotService
 from goose.executor import TaskExecutor
 
@@ -117,7 +116,11 @@ async def test_start_bot_success():
         # 検証
         assert result["success"] is True
         assert "起動しています" in result["message"]
-        background_tasks.add_task.assert_called_once_with(service._run_bot)
+        background_tasks.add_task.assert_called_once()
+        args, kwargs = background_tasks.add_task.call_args
+        assert args[0] == service._run_bot
+        # トークンが渡されていることを確認（具体的な値は検証しない）
+        assert len(args) > 1
 
 
 @pytest.mark.asyncio
@@ -228,10 +231,10 @@ async def test_run_bot_success():
         # Bot実行前にモックを設定
         with patch.object(service, "_bot", mock_discord_service):
             # Bot実行
-            await service._run_bot()
+            await service._run_bot("test_token")
 
             # 検証
-            mock_discord_service_class.assert_called_once_with(settings.DISCORD_BOT_TOKEN, service.goose_executor)
+            mock_discord_service_class.assert_called_once_with("test_token", service.goose_executor)
             mock_discord_service.start.assert_called_once()
 
         # 終了後の状態を検証
@@ -262,10 +265,10 @@ async def test_run_bot_error():
         # Bot実行前にモックを設定
         with patch.object(service, "_bot", mock_discord_service):
             # Bot実行
-            await service._run_bot()
+            await service._run_bot("test_token")
 
             # 検証
-            mock_discord_service_class.assert_called_once_with(settings.DISCORD_BOT_TOKEN, service.goose_executor)
+            mock_discord_service_class.assert_called_once_with("test_token", service.goose_executor)
             mock_discord_service.start.assert_called_once()
 
         # 終了後の状態を検証

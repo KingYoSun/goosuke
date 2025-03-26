@@ -5,6 +5,7 @@
 非同期セッションの作成と管理を行います。
 """
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -18,6 +19,13 @@ if settings.DATABASE_URL.startswith("sqlite:///"):
     db_url = settings.DATABASE_URL.replace("sqlite:///", "sqlite+aiosqlite:///")
 else:
     db_url = settings.DATABASE_URL
+
+# テスト用
+if settings.GOOSUKE_ENV == "test":
+    db_file_path = os.path.abspath("/app/db/test_database.db")
+    db_url = f"sqlite+aiosqlite:///{db_file_path}"
+    if os.path.exists(db_file_path):
+        os.remove(db_file_path)
 
 # 非同期エンジンの作成
 engine: AsyncEngine = create_async_engine(db_url, echo=settings.GOOSUKE_ENV == "development", future=True)

@@ -30,8 +30,8 @@ try:
         discord_router,
         extensions_router,
         health_router,
+        settings_router,
         tasks_router,
-        settings_router
     )
 except Exception as e:
     logger.error(f"routerのインポート中にエラーが発生しました: {e}")

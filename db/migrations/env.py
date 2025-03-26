@@ -75,11 +75,16 @@ def do_run_migrations(connection: Connection) -> None:
     Args:
         connection: SQLAlchemy接続オブジェクト
     """
+    # SQLiteのバッチモードを有効にする
+    is_sqlite = connection.dialect.name == "sqlite"
+
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
+        # SQLiteの場合はバッチモードを有効にする
+        render_as_batch=is_sqlite,
     )
 
     with context.begin_transaction():
@@ -121,11 +126,16 @@ def run_migrations_online() -> None:
         connectable = create_engine(url)
 
         with connectable.connect() as connection:
+            # SQLiteのバッチモードを有効にする
+            is_sqlite = connection.dialect.name == "sqlite"
+
             context.configure(
                 connection=connection,
                 target_metadata=target_metadata,
                 compare_type=True,
                 compare_server_default=True,
+                # SQLiteの場合はバッチモードを有効にする
+                render_as_batch=is_sqlite,
             )
 
             with context.begin_transaction():

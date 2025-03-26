@@ -4,8 +4,7 @@
 このモジュールは、アクションサービスの機能をテストします。
 """
 
-from contextlib import asynccontextmanager
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -27,22 +26,15 @@ async def test_create_action(db_session):
     await db_session.commit()
     await db_session.refresh(task_template)
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # アクションサービスのインスタンスを作成
     action_service = ActionService()
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_service._get_db_context", override_get_db):
-        # アクションを作成
-        result = await action_service.create_action(
-            name="テストアクション",
-            action_type="api",
-            task_template_id=task_template.id,
-        )
+    # アクションを作成
+    result = await action_service.create_action(
+        name="テストアクション",
+        action_type="api",
+        task_template_id=task_template.id,
+    )
 
     # 結果を検証
     assert result["id"] is not None
@@ -65,18 +57,11 @@ async def test_get_action(db_session):
     await db_session.commit()
     await db_session.refresh(action)
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # アクションサービスのインスタンスを作成
     action_service = ActionService()
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_service._get_db_context", override_get_db):
-        # アクションを取得
-        result = await action_service.get_action(action.id)
+    # アクションを取得
+    result = await action_service.get_action(action.id)
 
     # 結果を検証
     assert result["id"] == action.id
@@ -102,33 +87,26 @@ async def test_list_actions(db_session):
 
     await db_session.commit()
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # アクションサービスのインスタンスを作成
     action_service = ActionService()
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_service._get_db_context", override_get_db):
-        # すべてのアクションを取得
-        all_results = await action_service.list_actions()
-        assert len(all_results) >= 3  # 他のテストで作成されたアクションも含まれる可能性がある
+    # すべてのアクションを取得
+    all_results = await action_service.list_actions()
+    assert len(all_results) >= 3  # 他のテストで作成されたアクションも含まれる可能性がある
 
-        # タイプでフィルタリング
-        api_results = await action_service.list_actions(action_type="api")
-        assert len(api_results) >= 2  # 少なくとも2つのAPIアクションがある
-        for result in api_results:
-            assert result["action_type"] == "api"
+    # タイプでフィルタリング
+    api_results = await action_service.list_actions(action_type="api")
+    assert len(api_results) >= 2  # 少なくとも2つのAPIアクションがある
+    for result in api_results:
+        assert result["action_type"] == "api"
 
-        # 有効/無効でフィルタリング
-        enabled_results = await action_service.list_actions(is_enabled=True)
-        disabled_results = await action_service.list_actions(is_enabled=False)
+    # 有効/無効でフィルタリング
+    enabled_results = await action_service.list_actions(is_enabled=True)
+    disabled_results = await action_service.list_actions(is_enabled=False)
 
-        # 少なくとも2つの有効なアクションと1つの無効なアクションがある
-        assert len(enabled_results) >= 2
-        assert len(disabled_results) >= 1
+    # 少なくとも2つの有効なアクションと1つの無効なアクションがある
+    assert len(enabled_results) >= 2
+    assert len(disabled_results) >= 1
 
 
 @pytest.mark.asyncio
@@ -154,11 +132,6 @@ async def test_trigger_action(db_session):
     await db_session.commit()
     await db_session.refresh(action)
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # TaskServiceのモックを作成
     mock_task_service = AsyncMock()
     mock_task_service.execute_task.return_value = {
@@ -171,10 +144,8 @@ async def test_trigger_action(db_session):
     # アクションサービスのインスタンスを作成（モックを注入）
     action_service = ActionService(task_service=mock_task_service)
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_service._get_db_context", override_get_db):
-        # アクションをトリガー
-        result = await action_service.trigger_action(action_id=action.id, input_data={"data": "テスト入力"})
+    # アクションをトリガー
+    result = await action_service.trigger_action(action_id=action.id, input_data={"data": "テスト入力"})
 
     # 結果を検証
     assert result["execution_id"] == 999

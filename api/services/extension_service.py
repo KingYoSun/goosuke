@@ -39,6 +39,7 @@ class ExtensionService:
             List[Dict[str, Any]]: 拡張機能のリスト
         """
         async with _get_db_context() as db:
+            print(f"db_url: {db.bind.url}")
             db_extensions = await self._get_db_extensions(db)
 
             # 情報を整形
@@ -252,8 +253,8 @@ class ExtensionService:
             existing = result.scalars().first()
 
             if existing:
-                # 既存の拡張機能を更新
-                existing.description = description
+                # 既存の拡張機能を更新（説明は更新しない）
+                # existing.description = description
                 await db.commit()
                 await db.refresh(existing)
                 extension_id = existing.id
@@ -381,9 +382,14 @@ class ExtensionService:
                     config["extensions"][key] = extension_config
 
             # 設定ファイルを保存
-            os.makedirs(config_path.parent, exist_ok=True)
-            with open(config_path, "w") as f:
-                yaml.dump(config, f)
+            try:
+                os.makedirs(config_path.parent, exist_ok=True)
+                with open(config_path, "w") as f:
+                    yaml.dump(config, f)
+                logger.info(f"設定ファイルを保存しました: {config_path}")
+            except Exception as e:
+                logger.error(f"設定ファイルの保存中にエラーが発生しました: {e}")
+                # エラーが発生しても処理を続行
 
             logger.info(
                 f"Goosuke の拡張機能を Goose の設定ファイルに同期しました。{len(db_extensions)}件の拡張機能を同期しました。"

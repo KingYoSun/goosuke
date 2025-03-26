@@ -4,9 +4,6 @@
 このモジュールは、アクション設定関連サービスの機能をテストします。
 """
 
-from contextlib import asynccontextmanager
-from unittest.mock import patch
-
 import pytest
 
 from api.models.action import Action
@@ -38,22 +35,15 @@ async def test_create_action_config(db_session):
     await db_session.commit()
     await db_session.refresh(action)
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # アクション設定関連サービスのインスタンスを作成
     action_config_service = ActionConfigService()
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_config_service._get_db_context", override_get_db):
-        # アクション設定関連を作成
-        result = await action_config_service.create_action_config(
-            action_id=action.id,
-            config_type="discord",
-            config_id=1,
-        )
+    # アクション設定関連を作成
+    result = await action_config_service.create_action_config(
+        action_id=action.id,
+        config_type="discord",
+        config_id=1,
+    )
 
     # 結果を検証
     assert result["id"] is not None
@@ -97,21 +87,14 @@ async def test_get_action_by_config(db_session):
     await db_session.commit()
     await db_session.refresh(action_config)
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # アクション設定関連サービスのインスタンスを作成
     action_config_service = ActionConfigService()
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_config_service._get_db_context", override_get_db):
-        # 設定によるアクション取得
-        result = await action_config_service.get_action_by_config(
-            config_type="discord",
-            config_id=123,
-        )
+    # 設定によるアクション取得
+    result = await action_config_service.get_action_by_config(
+        config_type="discord",
+        config_id=123,
+    )
 
     # 結果を検証
     assert result is not None
@@ -122,11 +105,10 @@ async def test_get_action_by_config(db_session):
     assert result["is_enabled"] is True
 
     # 存在しない設定でテスト
-    with patch("api.services.action_config_service._get_db_context", override_get_db):
-        result = await action_config_service.get_action_by_config(
-            config_type="discord",
-            config_id=999,
-        )
+    result = await action_config_service.get_action_by_config(
+        config_type="discord",
+        config_id=999,
+    )
 
     # 結果を検証
     assert result is None
@@ -166,21 +148,14 @@ async def test_get_action_by_config_disabled(db_session):
     await db_session.commit()
     await db_session.refresh(action_config)
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # アクション設定関連サービスのインスタンスを作成
     action_config_service = ActionConfigService()
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_config_service._get_db_context", override_get_db):
-        # 設定による無効化アクション取得
-        result = await action_config_service.get_action_by_config(
-            config_type="discord",
-            config_id=456,
-        )
+    # 設定による無効化アクション取得
+    result = await action_config_service.get_action_by_config(
+        config_type="discord",
+        config_id=456,
+    )
 
     # 結果を検証（無効化されたアクションは取得されない）
     assert result is None
@@ -232,27 +207,21 @@ async def test_list_configs_by_action(db_session):
         db_session.add(config)
     await db_session.commit()
 
-    # get_db関数をオーバーライドして、テスト用のdb_sessionを返すようにする
-    @asynccontextmanager
-    async def override_get_db():
-        yield db_session
-
     # アクション設定関連サービスのインスタンスを作成
     action_config_service = ActionConfigService()
 
-    # get_db関数をパッチして、テスト用のdb_sessionを使用する
-    with patch("api.services.action_config_service._get_db_context", override_get_db):
-        # すべての設定を取得
-        all_results = await action_config_service.list_configs_by_action(action.id)
-        assert len(all_results) == 3
+    # すべての設定を取得
+    all_results = await action_config_service.list_configs_by_action(action.id)
+    assert len(all_results) == 3
 
-        # タイプでフィルタリング
-        discord_results = await action_config_service.list_configs_by_action(action.id, config_type="discord")
-        assert len(discord_results) == 2
-        for result in discord_results:
-            assert result["config_type"] == "discord"
+    # タイプでフィルタリング
+    discord_results = await action_config_service.list_configs_by_action(action.id, config_type="discord")
+    assert len(discord_results) == 2
+    for result in discord_results:
+        assert result["config_type"] == "discord"
 
-        slack_results = await action_config_service.list_configs_by_action(action.id, config_type="slack")
-        assert len(slack_results) == 1
-        assert slack_results[0]["config_type"] == "slack"
-        assert slack_results[0]["config_id"] == 3
+    # slackタイプの設定を取得
+    slack_results = await action_config_service.list_configs_by_action(action.id, config_type="slack")
+    assert len(slack_results) == 1
+    assert slack_results[0]["config_type"] == "slack"
+    assert slack_results[0]["config_id"] == 3
