@@ -14,6 +14,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import init_db
+from .routes import (
+    actions_router,
+    auth_router,
+    discord_config_router,
+    discord_router,
+    extensions_router,
+    health_router,
+    mcp_router,
+    settings_router,
+    tasks_router,
+)
 
 # ロガーの設定
 logging.basicConfig(
@@ -21,20 +32,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("goosuke")
-
-try:
-    from .routes import (
-        actions_router,
-        auth_router,
-        discord_config_router,
-        discord_router,
-        extensions_router,
-        health_router,
-        settings_router,
-        tasks_router,
-    )
-except Exception as e:
-    logger.error(f"routerのインポート中にエラーが発生しました: {e}")
 
 # FastAPIアプリケーションの作成
 app = FastAPI(
@@ -63,6 +60,7 @@ app.include_router(discord_router)
 app.include_router(discord_config_router)  # Discord設定ルーター
 app.include_router(settings_router)  # 設定ルーター
 app.include_router(health_router)
+app.include_router(mcp_router)  # MCPルーターを追加
 
 
 @app.on_event("startup")

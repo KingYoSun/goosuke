@@ -14,7 +14,7 @@ from fastapi import (
 
 from ..auth.dependencies import get_current_active_admin, get_current_user
 from ..models.user import User
-from ..services.discord_service import DiscordBotService
+from ..services.discord_service import DiscordBotManager
 
 router = APIRouter(prefix="/api/v1/discord", tags=["Discord連携"])
 
@@ -33,7 +33,7 @@ async def start_discord_bot(
     Returns:
         Dict[str, Any]: 起動結果
     """
-    discord_service = DiscordBotService()
+    discord_service = DiscordBotManager()
     return await discord_service.start_bot(background_tasks)
 
 
@@ -47,7 +47,7 @@ async def stop_discord_bot(current_user: User = Depends(get_current_active_admin
     Returns:
         Dict[str, Any]: 停止結果
     """
-    discord_service = DiscordBotService()
+    discord_service = DiscordBotManager()
     return await discord_service.stop_bot()
 
 
@@ -61,5 +61,5 @@ async def get_discord_bot_status(current_user: User = Depends(get_current_user))
     Returns:
         Dict[str, Any]: ステータス情報
     """
-    discord_service = DiscordBotService()
+    discord_service = DiscordBotManager()
     return await discord_service.get_status()

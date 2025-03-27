@@ -453,6 +453,11 @@ class ExtensionService:
                         logger.warning(f"拡張機能名が見つかりません: {key}")
                         continue
 
+                    # sseの拡張機能は同期しない
+                    if extension_type == "sse":
+                        logger.info(f"SSE拡張機能はスキップします: {name}")
+                        continue
+
                     if name in db_extensions_dict:
                         # 既存の拡張機能を更新
                         ext = db_extensions_dict[name]

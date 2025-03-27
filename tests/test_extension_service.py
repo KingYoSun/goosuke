@@ -614,6 +614,52 @@ async def test_sync_to_goose_error_handling(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
+async def test_sync_from_goose_skip_sse(db_session: AsyncSession):
+    """SSE拡張機能がスキップされることをテスト"""
+    # テスト用の設定ファイル内容をモック
+    test_extensions = {
+        "ext1": {
+            "enabled": True,
+            "type": "stdio",
+            "cmd": "python",
+            "args": ["-m", "ext1"],
+            "timeout": 300,
+            "envs": {"ENV1": "value1"},
+            "name": "Extension 1",
+        },
+        "ext2": {
+            "enabled": True,
+            "type": "sse",  # SSE拡張機能（スキップされるべき）
+            "name": "SSE Extension",
+        },
+    }
+
+    # read_goose_extensionsをモック化
+    with patch("api.services.extension_service.read_goose_extensions", return_value=test_extensions):
+        # サービスのインスタンスを作成
+        service = ExtensionService()
+
+        result = await service.sync_from_goose()
+
+        # 検証
+        assert result["success"] is True
+        assert result["synced_count"] == 1  # SSE拡張機能はスキップされるため1つだけ
+
+        # SSE拡張機能が存在しないことを確認
+        query = select(Extension).where(Extension.name == "SSE Extension")
+        db_result = await db_session.execute(query)
+        sse_extension = db_result.scalars().first()
+        assert sse_extension is None
+
+        # stdio拡張機能が存在することを確認
+        query = select(Extension).where(Extension.name == "Extension 1")
+        db_result = await db_session.execute(query)
+        stdio_extension = db_result.scalars().first()
+        assert stdio_extension is not None
+        assert stdio_extension.type == "stdio"
+
+
+@pytest.mark.asyncio
 async def test_sync_from_goose_error_handling(db_session: AsyncSession):
     """Goose設定ファイルからの同期エラー処理をテスト"""
     # 例外を発生させるようにモック

@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from extensions.discord.bot import DiscordService
+from extensions.discord.bot import DiscordBotService
 from goose.executor import TaskExecutor
 
 
@@ -103,7 +103,7 @@ class MockReference:
 
 @pytest.mark.asyncio
 async def test_discord_service_init():
-    """DiscordServiceの初期化をテスト"""
+    """DiscordBotServiceの初期化をテスト"""
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
@@ -118,8 +118,8 @@ async def test_discord_service_init():
         mock_bot = MagicMock()
         mock_bot_class.return_value = mock_bot
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # 初期化の検証
         assert service.token == "test_token"
@@ -135,7 +135,7 @@ async def test_on_ready_handler():
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
-    # DiscordServiceのインスタンスを作成
+    # DiscordBotServiceのインスタンスを作成
     with (
         patch("discord.Intents.all"),
         patch("discord.ext.commands.Bot") as mock_bot_class,
@@ -157,8 +157,8 @@ async def test_on_ready_handler():
 
         mock_bot.event = mock_event_decorator
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # on_readyハンドラを取得
         on_ready_handler = event_handlers.get("on_ready")
@@ -175,7 +175,7 @@ async def test_on_reaction_add_handler_bot_reaction():
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
-    # DiscordServiceのインスタンスを作成
+    # DiscordBotServiceのインスタンスを作成
     with (
         patch("discord.Intents.all"),
         patch("discord.ext.commands.Bot") as mock_bot_class,
@@ -185,8 +185,8 @@ async def test_on_reaction_add_handler_bot_reaction():
         mock_bot = MagicMock()
         mock_bot_class.return_value = mock_bot
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # _handle_discord_actionをモック
         service._handle_discord_action = AsyncMock()
@@ -217,7 +217,7 @@ async def test_on_reaction_add_handler_pencil_reaction():
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
-    # DiscordServiceのインスタンスを作成
+    # DiscordBotServiceのインスタンスを作成
     with (
         patch("discord.Intents.all"),
         patch("discord.ext.commands.Bot") as mock_bot_class,
@@ -227,8 +227,8 @@ async def test_on_reaction_add_handler_pencil_reaction():
         mock_bot = MagicMock()
         mock_bot_class.return_value = mock_bot
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # _handle_discord_actionをモック
         service._handle_discord_action = AsyncMock()
@@ -285,7 +285,7 @@ async def test_on_reaction_add_handler_non_pencil_reaction():
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
-    # DiscordServiceのインスタンスを作成
+    # DiscordBotServiceのインスタンスを作成
     with (
         patch("discord.Intents.all"),
         patch("discord.ext.commands.Bot") as mock_bot_class,
@@ -295,8 +295,8 @@ async def test_on_reaction_add_handler_non_pencil_reaction():
         mock_bot = MagicMock()
         mock_bot_class.return_value = mock_bot
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # _handle_discord_actionをモック
         service._handle_discord_action = AsyncMock()
@@ -350,7 +350,7 @@ async def test_start_and_close():
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
-    # DiscordServiceのインスタンスを作成
+    # DiscordBotServiceのインスタンスを作成
     with (
         patch("discord.Intents.all"),
         patch("discord.ext.commands.Bot") as mock_bot_class,
@@ -362,8 +362,8 @@ async def test_start_and_close():
         mock_bot.close = AsyncMock()
         mock_bot_class.return_value = mock_bot
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # 起動テスト
         await service.start()
@@ -379,11 +379,11 @@ def test_message_to_dict():
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
-    # DiscordServiceのインスタンスを作成
+    # DiscordBotServiceのインスタンスを作成
     with patch("discord.Intents.all"), patch("discord.ext.commands.Bot"):
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # テスト用のメッセージ
         reference = MockReference(message_id=777)
@@ -413,11 +413,11 @@ def test_split_message():
     # TaskExecutorのモック
     mock_executor = AsyncMock(spec=TaskExecutor)
 
-    # DiscordServiceのインスタンスを作成
+    # DiscordBotServiceのインスタンスを作成
     with patch("discord.Intents.all"), patch("discord.ext.commands.Bot"):
 
-        # DiscordServiceのインスタンスを作成
-        service = DiscordService("test_token", mock_executor)
+        # DiscordBotServiceのインスタンスを作成
+        service = DiscordBotService("test_token", mock_executor)
 
         # テスト用の長いメッセージ
         long_message = "a" * 100 + "b" * 100 + "c" * 100

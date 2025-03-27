@@ -4,6 +4,6 @@
 このパッケージは、アプリケーションの拡張機能を提供します。
 """
 
-from .discord import DiscordService
+from .discord import DiscordBotService
 
-__all__ = ["DiscordService"]
+__all__ = ["DiscordBotService"]

@@ -300,11 +300,11 @@ async def test_discord_bot_with_token_from_settings(db_session: AsyncSession):
     mock_background_tasks = MagicMock()
 
     # Discord Botの起動を試みる
-    from api.services.discord_service import DiscordBotService
+    from api.services.discord_service import DiscordBotManager
 
     # _run_botメソッドをモック化
-    with patch.object(DiscordBotService, "_run_bot", return_value=None) as mock_run_bot:
-        discord_service = DiscordBotService()
+    with patch.object(DiscordBotManager, "_run_bot", return_value=None) as mock_run_bot:
+        discord_service = DiscordBotManager()
         result = await discord_service.start_bot(mock_background_tasks)
 
         # 起動が成功したことを確認

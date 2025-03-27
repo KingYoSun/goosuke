@@ -49,7 +49,17 @@ RUN mkdir -p /home/goosuke/.config/goose
 RUN cat <<EOF > /home/goosuke/.config/goose/config.yaml
 GOOSE_PROVIDER: ${GOOSE_PROVIDER}
 GOOSE_MODEL: ${GOOSE_MODEL}
-keyring: false
+EOF
+
+RUN cat <<EOF >> /home/goosuke/.config/goose/config.yaml
+extensions:
+  discord:
+    enabled: true
+    envs: {}
+    name: discord
+    timeout: 30
+    type: sse
+    uri: http://localhost:8000/mcp/discord/sse
 EOF
 
 # 最終確認 - gooseコマンドが利用可能か確認

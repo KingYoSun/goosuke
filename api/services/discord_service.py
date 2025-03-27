@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import BackgroundTasks
 
-from extensions.discord import DiscordService
+from extensions.discord import DiscordBotService as DiscordBot
 from goose.executor import TaskExecutor
 
 from ..config import settings
@@ -18,7 +18,7 @@ from .discord_config_service import DiscordConfigService
 from .task_service import TaskService
 
 
-class DiscordBotService:
+class DiscordBotManager:
     """Discord Bot連携サービスクラス"""
 
     _instance = None
@@ -26,10 +26,10 @@ class DiscordBotService:
     _is_running = False
     _initialized = False
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls):
         """シングルトンパターンの実装"""
         if cls._instance is None:
-            cls._instance = super(DiscordBotService, cls).__new__(cls)
+            cls._instance = super(DiscordBotManager, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
@@ -133,7 +133,7 @@ class DiscordBotService:
             token (str): Discord Botトークン
         """
         try:
-            self._bot = DiscordService(token, self.goose_executor)
+            self._bot = DiscordBot(token, self.goose_executor)
             self._is_running = True
 
             self.logger.info("Discord Botを起動しています...")

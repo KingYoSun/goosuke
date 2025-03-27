@@ -16,20 +16,6 @@ max_line_length = 100
 # ディレクトリ構造を維持
 respect_directory_structure = true
 
-# 依存関係設定
-dependencies = [
-  "fastapi>=0.100.0",
-  "uvicorn>=0.22.0",
-  "python-jose>=3.3.0",
-  "python-multipart>=0.0.6",
-  "sqlalchemy>=2.0.0",
-  "pydantic>=2.0.0",
-  "aiohttp>=3.8.5",
-  "discord.py>=2.3.0",
-  "python-dotenv>=1.0.0",
-  "passlib>=1.7.4"
-]
-
 # Docker設定
 docker_base_image = "python:3.10-slim"
 use_multi_stage_build = true

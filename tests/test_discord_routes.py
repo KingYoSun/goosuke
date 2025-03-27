@@ -13,8 +13,8 @@ from httpx import AsyncClient
 @pytest.mark.asyncio
 async def test_start_discord_bot(client: AsyncClient, test_admin):
     """Discord Bot起動エンドポイントのテスト"""
-    # DiscordBotServiceのモック
-    with patch("api.routes.discord.DiscordBotService") as mock_service_class:
+    # DiscordBotManagerのモック
+    with patch("api.routes.discord.DiscordBotManager") as mock_service_class:
         # モックの設定
         mock_service = AsyncMock()
         mock_service.start_bot.return_value = {
@@ -65,8 +65,8 @@ async def test_start_discord_bot_unauthorized(client: AsyncClient, test_user):
 @pytest.mark.asyncio
 async def test_stop_discord_bot(client: AsyncClient, test_admin):
     """Discord Bot停止エンドポイントのテスト"""
-    # DiscordBotServiceのモック
-    with patch("api.routes.discord.DiscordBotService") as mock_service_class:
+    # DiscordBotManagerのモック
+    with patch("api.routes.discord.DiscordBotManager") as mock_service_class:
         # モックの設定
         mock_service = AsyncMock()
         mock_service.stop_bot.return_value = {
@@ -99,8 +99,8 @@ async def test_stop_discord_bot(client: AsyncClient, test_admin):
 @pytest.mark.asyncio
 async def test_get_discord_bot_status(client: AsyncClient, test_user):
     """Discord Botステータス取得エンドポイントのテスト"""
-    # DiscordBotServiceのモック
-    with patch("api.routes.discord.DiscordBotService") as mock_service_class:
+    # DiscordBotManagerのモック
+    with patch("api.routes.discord.DiscordBotManager") as mock_service_class:
         # モックの設定
         mock_service = AsyncMock()
         mock_service.get_status.return_value = {

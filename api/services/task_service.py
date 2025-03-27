@@ -73,6 +73,91 @@ class TaskService:
                 "created_at": task_template.created_at.isoformat() if task_template.created_at else None,
             }
 
+    async def create_task_execution(
+        self,
+        task_template_id: int,
+        context: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """タスク実行を作成する
+
+        Args:
+            task_template_id (int): タスクテンプレートID
+            context (Optional[Dict[str, Any]], optional): コンテキスト。デフォルトはNone
+            user_id (Optional[int], optional): ユーザーID。デフォルトはNone
+
+        Returns:
+            Dict[str, Any]: 作成されたタスク実行
+        """
+        async with _get_db_context() as db:
+            task_execution = TaskExecution(
+                template_id=task_template_id,
+                user_id=user_id,
+                context=context,
+                status="pending",
+            )
+            db.add(task_execution)
+            await db.commit()
+            await db.refresh(task_execution)
+
+            return {
+                "id": task_execution.id,
+                "template_id": task_execution.template_id,
+                "user_id": task_execution.user_id,
+                "context": task_execution.context,
+                "status": task_execution.status,
+                "created_at": task_execution.created_at.isoformat() if task_execution.created_at else None,
+            }
+
+    async def update_task_execution(
+        self,
+        task_execution_id: int,
+        status: Optional[str] = None,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """タスク実行を更新する
+
+        Args:
+            task_execution_id (int): タスク実行ID
+            status (Optional[str], optional): ステータス。デフォルトはNone
+            result (Optional[Dict[str, Any]], optional): 実行結果。デフォルトはNone
+            error (Optional[str], optional): エラーメッセージ。デフォルトはNone
+
+        Returns:
+            Dict[str, Any]: 更新されたタスク実行
+        """
+        async with _get_db_context() as db:
+            task_execution = await db.get(TaskExecution, task_execution_id)
+            if not task_execution:
+                raise ValueError(f"タスク実行が見つかりません: {task_execution_id}")
+
+            if status:
+                task_execution.status = status
+
+            if result:
+                task_execution.result = result.get("output", "")
+                task_execution.extensions_output = result.get("extensions_output", {})
+
+            if error:
+                task_execution.error = error
+
+            if status == "completed" or status == "failed":
+                task_execution.completed_at = datetime.now()
+
+            await db.commit()
+            await db.refresh(task_execution)
+
+            return {
+                "id": task_execution.id,
+                "template_id": task_execution.template_id,
+                "user_id": task_execution.user_id,
+                "status": task_execution.status,
+                "result": task_execution.result,
+                "error": task_execution.error,
+                "completed_at": task_execution.completed_at.isoformat() if task_execution.completed_at else None,
+            }
+
     async def execute_task(
         self,
         template_id: int,

@@ -6,6 +6,7 @@ Discord.pyを使用してBotを実装し、メッセージやリアクション�
 """
 
 import logging
+from typing import Any, Dict, Optional
 
 import discord
 from discord.ext import commands
@@ -15,7 +16,7 @@ from api.services.discord_config_service import DiscordConfigService
 from api.services.task_service import TaskService
 
 
-class DiscordService:
+class DiscordBotService:
     """Discord連携サービスクラス"""
 
     def __init__(self, token: str, goose_executor):
@@ -94,11 +95,15 @@ class DiscordService:
             context = {
                 "messages": [self._message_to_dict(msg) for msg in messages],
                 "channel_name": message.channel.name,
+                "channel_id": str(message.channel.id),  # チャンネルIDを追加
+                "processing_message_id": str(processing_msg.id),  # 処理中メッセージIDを追加
                 "timestamp": message.created_at.isoformat(),
                 "requested_by": user.name,
                 "discord_url": message.jump_url,
                 "catch_type": discord_config["catch_type"],
                 "catch_value": discord_config["catch_value"],
+                "response_format": discord_config["response_format"],  # レスポンス形式を追加
+                "user_mention": user.mention,  # ユーザーメンションを追加
             }
 
             # 関連するタスクテンプレートを取得
@@ -108,6 +113,11 @@ class DiscordService:
                 await processing_msg.edit(content=f"{user.mention} 関連するタスクテンプレートが見つかりません。")
                 return
 
+            # タスク実行を作成
+            task_execution = await task_service.create_task_execution(
+                task_template_id=action["task_template_id"], context=context
+            )
+
             # Gooseにリクエスト
             result = await self.goose_executor.execute(task["prompt"], context=context)
 
@@ -116,11 +126,13 @@ class DiscordService:
                 self.logger.error(f"処理エラー: {result['output']}")
                 return
 
-            # 結果をDiscordに表示
-            output = result["output"]
+            # 結果をTaskExecutionに保存するのみ（Discord送信はMCPを通じて行う）
+            await task_service.update_task_execution(
+                task_execution_id=task_execution["id"], status="completed", result=result
+            )
 
-            # レスポンス形式に基づいて結果を送信
-            await self._send_response(message, user, output, processing_msg, discord_config["response_format"])
+            # 注意: ここでは直接Discordに送信しない
+            # MCPを通じてGooseエージェントが送信する
 
         except Exception as e:
             self.logger.error(f"Discord処理エラー: {str(e)}")
@@ -220,9 +232,215 @@ class DiscordService:
         """
         return [message[i : i + chunk_size] for i in range(0, len(message), chunk_size)]
 
+    async def send_message(
+        self, channel_id: str, content: str, reference_message_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Discordチャンネルにメッセージを送信する
+
+        Args:
+            channel_id: チャンネルID
+            content: メッセージ内容
+            reference_message_id: 返信対象のメッセージID（オプション）
+
+        Returns:
+            Dict[str, Any]: 送信結果（message_id等）
+        """
+        try:
+            # チャンネルを取得
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                self.logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return {"success": False, "error": f"チャンネルが見つかりません: {channel_id}"}
+
+            # 返信対象のメッセージがある場合
+            reference = None
+            if reference_message_id:
+                try:
+                    reference_message = await channel.fetch_message(int(reference_message_id))
+                    reference = reference_message.to_reference()
+                except Exception as e:
+                    self.logger.warning(f"参照メッセージの取得に失敗: {str(e)}")
+
+            # メッセージ送信
+            message = await channel.send(content=content, reference=reference)
+
+            return {"success": True, "message_id": str(message.id), "channel_id": str(channel.id)}
+        except Exception as e:
+            self.logger.error(f"メッセージ送信エラー: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def edit_message(self, channel_id: str, message_id: str, content: str) -> Dict[str, Any]:
+        """Discordメッセージを編集する
+
+        Args:
+            channel_id: チャンネルID
+            message_id: メッセージID
+            content: 新しいメッセージ内容
+
+        Returns:
+            Dict[str, Any]: 編集結果
+        """
+        try:
+            # チャンネルを取得
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                self.logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return {"success": False, "error": f"チャンネルが見つかりません: {channel_id}"}
+
+            # メッセージを取得
+            try:
+                message = await channel.fetch_message(int(message_id))
+            except Exception as e:
+                self.logger.error(f"メッセージが見つかりません: {message_id}, エラー: {str(e)}")
+                return {"success": False, "error": f"メッセージが見つかりません: {message_id}"}
+
+            # メッセージを編集
+            await message.edit(content=content)
+
+            return {"success": True, "message_id": message_id, "channel_id": channel_id}
+        except Exception as e:
+            self.logger.error(f"メッセージ編集エラー: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def delete_message(self, channel_id: str, message_id: str) -> Dict[str, Any]:
+        """Discordメッセージを削除する
+
+        Args:
+            channel_id: チャンネルID
+            message_id: メッセージID
+
+        Returns:
+            Dict[str, Any]: 削除結果
+        """
+        try:
+            # チャンネルを取得
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                self.logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return {"success": False, "error": f"チャンネルが見つかりません: {channel_id}"}
+
+            # メッセージを取得
+            try:
+                message = await channel.fetch_message(int(message_id))
+            except Exception as e:
+                self.logger.error(f"メッセージが見つかりません: {message_id}, エラー: {str(e)}")
+                return {"success": False, "error": f"メッセージが見つかりません: {message_id}"}
+
+            # メッセージを削除
+            await message.delete()
+
+            return {"success": True, "message_id": message_id, "channel_id": channel_id}
+        except Exception as e:
+            self.logger.error(f"メッセージ削除エラー: {str(e)}")
+            return {"success": False, "error": str(e)}
+
     async def start(self):
         """Botを起動"""
         await self.bot.start(self.token)
+
+    async def get_message(self, channel_id: str, message_id: str) -> Dict[str, Any]:
+        """特定のDiscordメッセージを取得する
+
+        Args:
+            channel_id: チャンネルID
+            message_id: メッセージID
+
+        Returns:
+            Dict[str, Any]: 取得結果（message等）
+        """
+        try:
+            # チャンネルを取得
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                self.logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return {"success": False, "error": f"チャンネルが見つかりません: {channel_id}"}
+
+            # メッセージを取得
+            try:
+                message = await channel.fetch_message(int(message_id))
+                return {"success": True, "message": self._message_to_dict(message), "channel_id": str(channel.id)}
+            except Exception as e:
+                self.logger.error(f"メッセージが見つかりません: {message_id}, エラー: {str(e)}")
+                return {"success": False, "error": f"メッセージが見つかりません: {message_id}"}
+        except Exception as e:
+            self.logger.error(f"メッセージ取得エラー: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def get_message_history(
+        self, channel_id: str, reference_message_id: Optional[str] = None, limit: int = 10
+    ) -> Dict[str, Any]:
+        """チャンネルの履歴からメッセージを取得する
+
+        Args:
+            channel_id: チャンネルID
+            reference_message_id: 基準となるメッセージID（指定した場合はそのメッセージより前のメッセージを取得）
+            limit: 取得するメッセージの最大数
+
+        Returns:
+            Dict[str, Any]: 取得結果（messages等）
+        """
+        try:
+            # チャンネルを取得
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                self.logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return {"success": False, "error": f"チャンネルが見つかりません: {channel_id}"}
+
+            # 基準となるメッセージを取得（指定されている場合）
+            before = None
+            if reference_message_id:
+                try:
+                    before = await channel.fetch_message(int(reference_message_id))
+                except Exception as e:
+                    self.logger.warning(f"参照メッセージの取得に失敗: {str(e)}")
+                    return {"success": False, "error": f"参照メッセージの取得に失敗: {str(e)}"}
+
+            # メッセージ履歴を取得
+            messages = []
+            async for msg in channel.history(limit=limit, before=before):
+                messages.append(self._message_to_dict(msg))
+
+            return {"success": True, "messages": messages, "channel_id": str(channel.id), "count": len(messages)}
+        except Exception as e:
+            self.logger.error(f"メッセージ履歴取得エラー: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def search_messages(self, channel_id: str, query: str, limit: int = 25) -> Dict[str, Any]:
+        """チャンネル内のメッセージを検索する
+
+        Args:
+            channel_id: チャンネルID
+            query: 検索クエリ
+            limit: 取得するメッセージの最大数
+
+        Returns:
+            Dict[str, Any]: 検索結果（messages等）
+        """
+        try:
+            # チャンネルを取得
+            channel = self.bot.get_channel(int(channel_id))
+            if not channel:
+                self.logger.error(f"チャンネルが見つかりません: {channel_id}")
+                return {"success": False, "error": f"チャンネルが見つかりません: {channel_id}"}
+
+            # メッセージを検索（discord.pyではネイティブの検索機能がないため、履歴を取得して検索）
+            messages = []
+            async for msg in channel.history(limit=100):  # より多くのメッセージから検索するために多めに取得
+                if query.lower() in msg.content.lower():
+                    messages.append(self._message_to_dict(msg))
+                    if len(messages) >= limit:
+                        break
+
+            return {
+                "success": True,
+                "messages": messages,
+                "channel_id": str(channel.id),
+                "count": len(messages),
+                "query": query,
+            }
+        except Exception as e:
+            self.logger.error(f"メッセージ検索エラー: {str(e)}")
+            return {"success": False, "error": str(e)}
 
     async def close(self):
         """Botを停止"""
