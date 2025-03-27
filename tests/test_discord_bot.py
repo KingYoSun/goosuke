@@ -406,27 +406,3 @@ def test_message_to_dict():
         assert result["content"] == "テスト内容"
         assert result["timestamp"] == created_at.isoformat()
         assert result["reference_id"] == "777"
-
-
-def test_split_message():
-    """メッセージ分割をテスト"""
-    # TaskExecutorのモック
-    mock_executor = AsyncMock(spec=TaskExecutor)
-
-    # DiscordBotServiceのインスタンスを作成
-    with patch("discord.Intents.all"), patch("discord.ext.commands.Bot"):
-
-        # DiscordBotServiceのインスタンスを作成
-        service = DiscordBotService("test_token", mock_executor)
-
-        # テスト用の長いメッセージ
-        long_message = "a" * 100 + "b" * 100 + "c" * 100
-
-        # 分割を実行（チャンクサイズ100）
-        result = service._split_message(long_message, 100)
-
-        # 検証
-        assert len(result) == 3
-        assert result[0] == "a" * 100
-        assert result[1] == "b" * 100
-        assert result[2] == "c" * 100

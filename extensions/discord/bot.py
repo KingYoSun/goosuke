@@ -165,44 +165,6 @@ class DiscordBotService:
         else:
             return [message]
 
-    async def _send_response(self, message, user, output, processing_msg, response_format):
-        """レスポンス形式に基づいて結果を送信
-
-        Args:
-            message: 元のメッセージ
-            user: リクエストしたユーザー
-            output: 処理結果
-            processing_msg: 処理中メッセージ
-            response_format: レスポンス形式（"reply", "dm", "channel"）
-        """
-        response = f"{user.mention} 処理が完了しました。\n\n{output}\n\n"
-
-        # Discordのメッセージ長制限を考慮
-        if len(response) > 2000:
-            chunks = self._split_message(response, 1900)  # マージンを残す
-
-            if response_format == "reply":
-                await processing_msg.edit(content=chunks[0])
-                for chunk in chunks[1:]:
-                    await message.channel.send(chunk)
-            elif response_format == "dm":
-                for chunk in chunks:
-                    await user.send(chunk)
-                await processing_msg.edit(content=f"{user.mention} DMに結果を送信しました。")
-            elif response_format == "channel":
-                for chunk in chunks:
-                    await message.channel.send(chunk)
-                await processing_msg.delete()
-        else:
-            if response_format == "reply":
-                await processing_msg.edit(content=response)
-            elif response_format == "dm":
-                await user.send(response)
-                await processing_msg.edit(content=f"{user.mention} DMに結果を送信しました。")
-            elif response_format == "channel":
-                await message.channel.send(response)
-                await processing_msg.delete()
-
     def _message_to_dict(self, message):
         """メッセージをディクショナリに変換
 
@@ -219,18 +181,6 @@ class DiscordBotService:
             "timestamp": message.created_at.isoformat(),
             "reference_id": (str(message.reference.message_id) if message.reference else None),
         }
-
-    def _split_message(self, message, chunk_size):
-        """メッセージを指定サイズのチャンクに分割
-
-        Args:
-            message: メッセージ
-            chunk_size: チャンクサイズ
-
-        Returns:
-            List[str]: 分割されたメッセージのリスト
-        """
-        return [message[i : i + chunk_size] for i in range(0, len(message), chunk_size)]
 
     async def send_message(
         self, channel_id: str, content: str, reference_message_id: Optional[str] = None
